@@ -1,11 +1,15 @@
-use futures::{SinkExt, StreamExt, TryFutureExt};
-use tokio::io::AsyncBufReadExt;
-use tokio::sync::mpsc;
+use futures::{SinkExt, StreamExt}; //, TryFutureExt};
+use futures::stream::SplitStream;
+// use tokio::io::AsyncBufReadExt;
+// use tokio::sync::mpsc;
 use tokio::net::TcpStream;
+use tokio_stream::StreamMap;
 // use tokio_stream::StreamMap;
 use tokio_tungstenite::{connect_async, tungstenite::Message, MaybeTlsStream, WebSocketStream};
 use reqwest;
 use anyhow::{Context, Result};
+// use tokio::io::AsyncWriteExt;
+use serde_json; //::{Map, Value};
 
 // OK
 pub async fn get_bitstamp_snapshot(symbol: &String) -> Result<String> {
@@ -33,8 +37,8 @@ pub async fn get_binance_snapshot(symbol: &String) -> Result<String> {
 
 pub async fn get_binance_stream(symbol: &String) -> Result<WebSocketStream<MaybeTlsStream<TcpStream>>> {
     let ws_url_binance = url::Url::parse("wss://stream.binance.us:9443")
-    .context("bad binance url")?
-    .join(&format!("ws/{}@depth@100ms", symbol))?;
+    .context("wrong binance url")?
+    .join(&format!("/ws/{}@depth20@100ms", symbol))?;
 
     let (ws_stream_binance, _) = connect_async(&ws_url_binance)
     .await
@@ -43,11 +47,60 @@ pub async fn get_binance_stream(symbol: &String) -> Result<WebSocketStream<Maybe
 }
 
 
+pub async fn get_bitstamp_stream(symbol: &String) -> Result<WebSocketStream<MaybeTlsStream<TcpStream>>> {
+    let ws_url_bitstamp = url::Url::parse("wss://ws.bitstamp.net")
+    .context("wrong bitstamp url")?;
+
+    let (mut ws_stream_bitstamp, _) = connect_async(&ws_url_bitstamp)
+    .await
+    .context("Failed to connect to bitstamp wss endpoint")?;
+
+    let subscribe_msg = serde_json::json!({
+        "event": "bts:subscribe",
+        "data": {
+            "channel": format!("diff_order_book_{}", symbol)
+        }
+    });
+    println!("{}", subscribe_msg);
+
+    ws_stream_bitstamp.send(Message::Text(subscribe_msg.to_string())).await.unwrap();
+
+    println!("sent subscription message");
+
+    Ok(ws_stream_bitstamp)
+}
+
+// TODO: do this full implementation
+pub async fn get_all_streams(symbol: String) -> Result<StreamMap<String, SplitStream<WebSocketStream<MaybeTlsStream<TcpStream>>>>> {
+    let streams_map = StreamMap::new();
+    Ok(streams_map)
+}
+
+
 #[tokio::main]
 async fn main() -> Result<()>{
-    let connect_addr = "wss://ws.bitstamp.net";
-    let bitstamp_url = url::Url::parse(&connect_addr).context("Error parsing URL")?; // remember that ? is dependent on complete awaitable block/function, with correct return type and signature
-    let (mut ws_stream, _) = connect_async(&bitstamp_url).await.expect("Failed to connect");
+    // careful with binance, apparently btcusd is not btcusd but the correct ticker is btcusd
+    let symbol = "btcusdt".to_string();
+    
+    // This works
+    // let ws_stream = get_bitstamp_stream(&symbol).await.context("Error in getting bistamp stream").unwrap();
+
+    let ws_stream = get_binance_stream(&symbol).await.context("Error in getting bistamp stream").unwrap();
+    
+    let (_, read) = ws_stream.split();
+
+    let read_future = read.for_each(|message| async {
+        println!("receiving...");
+        let unwrapped_message = message.unwrap();
+         //let data = unwrapped_message.into_data();
+         let msg_str = unwrapped_message.into_text().unwrap();
+         // tokio::io::stdout().write(&data).await.unwrap();
+         println!("{}", msg_str);
+         println!("received...");
+    });
+
+    read_future.await;
+
     Ok(())
 }
 
