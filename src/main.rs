@@ -1,5 +1,7 @@
-use futures::{SinkExt, StreamExt, TryFutureExt}; //, TryFutureExt};
+use futures::{SinkExt, StreamExt}; //, TryFutureExt};
 use futures::stream::SplitStream;
+use prost::encoding::message;
+use tonic::{transport::Server, Status};
 // use tokio::io::AsyncBufReadExt;
 // use tokio::sync::mpsc;
 use tokio::net::TcpStream;
@@ -103,10 +105,13 @@ async fn main() -> Result<()>{
 
     // let ws_read_stream = get_binance_stream(&symbol).await.context("Error in getting bistamp stream").unwrap();
     let mut stream_map = get_all_streams(symbol).await.unwrap();
-    while let Some((key, val)) = stream_map.next().await {
+    while let Some((key, message)) = stream_map.next().await {
+        let message = message.map_err(|_| Status::internal("Failed to get message"))?;
+
+        let message_value: serde_json::Value = serde_json::from_slice(&message.into_data()).expect("can't parse");
         println!("UPDATE RECEIVED");
         println!("{}", key);
-        println!("{}", val.unwrap().into_text().unwrap());
+        println!("{}", message_value);
     }
 
     // let read_future = stream_map.for_each(|message| async {
