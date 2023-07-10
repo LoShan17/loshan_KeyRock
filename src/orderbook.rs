@@ -52,22 +52,6 @@ impl OrderBook {
 
     pub fn get_summary(&self) -> Result<Summary> {
         unimplemented!()
-        // let summary_asks = self.get_asks_levels();
-        // let summary_bids = self.get_bids_levels();
 
-        // if summary_asks.is_empty() || summary_bids.is_empty() {
-        //     tracing::error!(
-        //         "Summary spread cannot be calculated with {} bids and {} asks",
-        //         summary_bids.len(),
-        //         summary_asks.len()
-        //     );
-        //     bail!("Summary spread cannot be calculated".to_string());
-        // }
-
-        // Ok(Summary {
-        //     spread: summary_asks[0].price - summary_bids[0].price,
-        //     bids: summary_bids,
-        //     asks: summary_asks,
-        // })
     }
 }
