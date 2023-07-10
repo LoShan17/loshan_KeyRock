@@ -58,26 +58,3 @@ async fn main() -> Result<()>{
 //     println!("{}", binance_string_snapshot.expect("binance snapshot returned error"));
 //     println!("{}", "JUST printed binance".to_string());
 // }
-
-
-// final tokio main for grpc server
-// #[tokio::main]
-// async fn main() -> Result<()> {
-//     let subscriber = tracing_subscriber::fmt()
-//         .with_line_number(true)
-//         .with_max_level(tracing::Level::INFO)
-//         .finish();
-//     tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
-
-//     dotenv().ok();
-//     let addr = "127.0.0.1:9001";
-//     tracing::info!("Server listening on {}", addr);
-
-//     let socket_addr = addr.parse()?;
-//     let orderbook = OrderbookSummary::default();
-//     Server::builder()
-//         .add_service(OrderbookAggregatorServer::new(orderbook))
-//         .serve(socket_addr)
-//         .await?;
-//     Ok(())
-// }
