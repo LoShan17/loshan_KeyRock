@@ -1,4 +1,4 @@
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    tonic_build::compile_protos("protos/orderbook.proto")?;
+    tonic_build::compile_protos("protos/orderbookaggregator.proto")?;
     Ok(())
 }

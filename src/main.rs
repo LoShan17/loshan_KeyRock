@@ -1,98 +1,11 @@
+use loshan_keyrock::exchanges::{get_all_streams, get_binance_snapshot, get_bitstamp_snapshot};
+use loshan_keyrock::orderbookaggregator::{Level, Summary};
+
 use futures::{SinkExt, StreamExt}; //, TryFutureExt};
-use futures::stream::SplitStream;
-use prost::encoding::message;
 use tonic::{transport::Server, Status};
-// use tokio::io::AsyncBufReadExt;
-// use tokio::sync::mpsc;
-use tokio::net::TcpStream;
-use tokio_stream::StreamMap;
-// use tokio_stream::StreamMap;
 use tokio_tungstenite::{connect_async, tungstenite::Message, MaybeTlsStream, WebSocketStream};
-use reqwest;
 use anyhow::{Context, Result};
-// use tokio::io::AsyncWriteExt;
-use serde_json; //::{Map, Value};
-
-// OK
-pub async fn get_bitstamp_snapshot(symbol: &String) -> Result<String> {
-    let url = format!(
-        "https://www.bitstamp.net/api/v2/order_book/{}/",
-        symbol.to_lowercase()
-    );
-
-    let snapshot = reqwest::get(url).await?;
-    let body = snapshot.text().await?;
-    Ok(body)
-}
-
-// OK
-pub async fn get_binance_snapshot(symbol: &String) -> Result<String> {
-    let url = format!(
-        "https://www.binance.us/api/v3/depth?symbol={}&limit=1000",
-        symbol.to_uppercase()
-    );
-
-    let snapshot = reqwest::get(url).await?;
-    let body = snapshot.text().await?;
-    Ok(body)
-}
-
-pub async fn get_binance_stream(symbol: &String) -> Result<SplitStream<WebSocketStream<MaybeTlsStream<TcpStream>>>> {
-    let ws_url_binance = url::Url::parse("wss://stream.binance.us:9443")
-    .context("wrong binance url")?
-    .join(&format!("/ws/{}@depth20@100ms", symbol))?;
-
-    let (ws_stream_binance, _) = connect_async(&ws_url_binance)
-    .await
-    .context("Failed to connect to binance wss endpoint")?;
-
-    let (_, read_stream) = ws_stream_binance.split();
-
-    Ok(read_stream)
-}
-
-
-pub async fn get_bitstamp_stream(symbol: &String) -> Result<SplitStream<WebSocketStream<MaybeTlsStream<TcpStream>>>> {
-    let ws_url_bitstamp = url::Url::parse("wss://ws.bitstamp.net")
-    .context("wrong bitstamp url")?;
-
-    let (mut ws_stream_bitstamp, _) = connect_async(&ws_url_bitstamp)
-    .await
-    .context("Failed to connect to bitstamp wss endpoint")?;
-
-    let subscribe_msg = serde_json::json!({
-        "event": "bts:subscribe",
-        "data": {
-            "channel": format!("diff_order_book_{}", symbol)
-        }
-    });
-    println!("{}", subscribe_msg);
-
-    ws_stream_bitstamp.send(Message::Text(subscribe_msg.to_string())).await.unwrap();
-    //ws_stream_bitstamp.next();
-
-    println!("sent subscription message");
-    let (_, read_stream) = ws_stream_bitstamp.split();
-    // read_stream.next();
-
-    Ok(read_stream)
-}
-
-// TODO: do this full implementation
-pub async fn get_all_streams(symbol: String) -> Result<StreamMap<String, SplitStream<WebSocketStream<MaybeTlsStream<TcpStream>>>>> {
-    let mut streams_map = StreamMap::new();
-
-    let binance_stream_read = get_binance_stream(&symbol).await.unwrap();
-    streams_map.insert("BINANCE".to_string(), binance_stream_read);
-
-
-    let bitstamp_stream_read = get_bitstamp_stream(&symbol).await.unwrap();
-    streams_map.insert("BITSTAMP".to_string(), bitstamp_stream_read);
-
-    println!("all streams returning");
-
-    Ok(streams_map)
-}
+use serde_json;
 
 
 #[tokio::main]
@@ -144,4 +57,27 @@ async fn main() -> Result<()>{
 //     println!("{}", "JUST printed bitstamp".to_string());
 //     println!("{}", binance_string_snapshot.expect("binance snapshot returned error"));
 //     println!("{}", "JUST printed binance".to_string());
+// }
+
+
+// final tokio main for grpc server
+// #[tokio::main]
+// async fn main() -> Result<()> {
+//     let subscriber = tracing_subscriber::fmt()
+//         .with_line_number(true)
+//         .with_max_level(tracing::Level::INFO)
+//         .finish();
+//     tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
+
+//     dotenv().ok();
+//     let addr = "127.0.0.1:9001";
+//     tracing::info!("Server listening on {}", addr);
+
+//     let socket_addr = addr.parse()?;
+//     let orderbook = OrderbookSummary::default();
+//     Server::builder()
+//         .add_service(OrderbookAggregatorServer::new(orderbook))
+//         .serve(socket_addr)
+//         .await?;
+//     Ok(())
 // }
