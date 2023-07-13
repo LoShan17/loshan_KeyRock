@@ -7,10 +7,16 @@ use tokio_stream::StreamMap;
 use tokio_tungstenite::{connect_async, tungstenite::Message, MaybeTlsStream, WebSocketStream};
 use reqwest;
 use anyhow::{Context, Result};
-use serde_json;
+use serde_json::Value;
+use crate::orderbookaggregator::Level;
 
 // const EXCHANGES:Vec<String> = vec!["BINANCE".to_string(), "BITSTAMP".to_string()];
-
+#[derive(Debug, Default)]
+pub struct ParsedUpdate {
+    bids: Vec<Level>,
+    asks: Vec<Level>,
+    last_update_id: u64
+}
 // OK
 pub async fn get_bitstamp_snapshot(symbol: &String) -> Result<String> {
     let url = format!(
@@ -38,7 +44,7 @@ pub async fn get_binance_snapshot(symbol: &String) -> Result<String> {
 pub async fn get_binance_stream(symbol: &String) -> Result<SplitStream<WebSocketStream<MaybeTlsStream<TcpStream>>>> {
     let ws_url_binance = url::Url::parse("wss://stream.binance.us:9443")
     .context("wrong binance url")?
-    .join(&format!("/ws/{}@depth20@100ms", symbol))?;
+    .join(&format!("/ws/{}@depth10@100ms", symbol))?;
 
     let (ws_stream_binance, _) = connect_async(&ws_url_binance)
     .await
@@ -58,10 +64,19 @@ pub async fn get_bitstamp_stream(symbol: &String) -> Result<SplitStream<WebSocke
     .await
     .context("Failed to connect to bitstamp wss endpoint")?;
 
+    // try these 3?
+    // diff_order_book_[currency_pair]
+    // detail_order_book_[currency_pair]
+    // order_book_[currency_pair]
+
+    // from binance https://github.com/binance/binance-spot-api-docs/blob/master/web-socket-streams.md
+    // it seems that taking a snapshot and applying the diff feed is the only way.
+    // maybe worth keeping it consistent across the 2 exchanges and do it in a similar way
+
     let subscribe_msg = serde_json::json!({
         "event": "bts:subscribe",
         "data": {
-            "channel": format!("diff_order_book_{}", symbol)
+            "channel": format!("order_book_{}", symbol)
         }
     });
     println!("{}", subscribe_msg);
@@ -98,4 +113,67 @@ pub async fn get_all_streams(symbol: String) -> Result<StreamMap<&'static str, S
     println!("all streams returning");
 
     Ok(streams_map)
+}
+
+
+// for now the idea is simply to return a PrasedUpdate type/ maybe worth switching to HashMap instead of a Vec
+// with lareday as key the u64 from the mantissa of the float price?
+// with Levels as defined under .proto
+
+pub fn bitstamp_json_to_levels(value: &Value) -> Result<ParsedUpdate> {
+    
+    let mut vector_of_bids: Vec<Level> = Vec::with_capacity(value["bids"].as_array().expect("failed to get bids capacity").len());
+    let mut vector_of_asks: Vec<Level> = Vec::with_capacity(value["asks"].as_array().expect("failed to get asks capacity").len());
+    let last_update_id = value["data"]["microtimestamp"].as_u64().unwrap();
+
+    for bid in value["bids"].as_array().unwrap() {
+        let level = Level {
+            price: bid[0].to_string().parse::<f64>().unwrap(),
+            amount: bid[1].to_string().parse::<f64>().unwrap(),
+            exchange: "BITSTAMP".to_string(),
+        };
+        vector_of_bids.insert(0, level);
+    }
+
+    for ask in value["asks"].as_array().unwrap() {
+        let level = Level {
+            price: ask[0].to_string().parse::<f64>().unwrap(),
+            amount: ask[1].to_string().parse::<f64>().unwrap(),
+            exchange: "BITSTAMP".to_string(),
+        };
+        vector_of_asks.insert(0, level);
+    }
+
+    Ok(ParsedUpdate { bids: vector_of_bids, asks: vector_of_asks, last_update_id }) 
+}
+
+
+pub fn binance_json_to_levels(value: Value) -> Result<ParsedUpdate> {
+
+    let mut vector_of_bids: Vec<Level> = Vec::with_capacity(value["bids"].as_array().unwrap().len());
+    let mut vector_of_asks: Vec<Level> = Vec::with_capacity(value["asks"].as_array().unwrap().len());
+    let last_update_id = value["lastUpdateId"].as_u64().unwrap();
+
+    for bid in value["bids"].as_array().context("no array for bids in binance message")? {
+        // for number in bid.as_array().context("")? {
+
+        // }
+        let level = Level {
+            price: bid[0].as_str().context("no string?")?.parse::<f64>().context("no parse to float?")?,
+            amount: bid[1].as_str().context("no string?")?.parse::<f64>().context("no parse to float?")?,
+            exchange: "BINANCE".to_string(),
+        };
+        vector_of_bids.insert(0, level);
+    }
+
+    for ask in value["asks"].as_array().unwrap() {
+        let level = Level {
+            price: ask[0].as_str().context("no string?")?.parse::<f64>().context("no parse to float?")?,
+            amount: ask[1].as_str().context("no string?")?.parse::<f64>().context("no parse to float?")?,
+            exchange: "BINANCE".to_string(),
+        };
+        vector_of_asks.insert(0, level);
+    }
+
+    Ok(ParsedUpdate { bids: vector_of_bids, asks: vector_of_asks, last_update_id }) 
 }

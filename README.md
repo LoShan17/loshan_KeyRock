@@ -16,6 +16,9 @@ https://github.com/snapview/tokio-tungstenite/issues/137
 https://docs.rs/tokio-stream/latest/tokio_stream/struct.StreamMap.html
 https://docs.rs/futures/latest/futures/stream/struct.SplitStream.html
 
+https://github.com/binance/binance-spot-api-docs/blob/master/web-socket-streams.md
+notes explaining how to take an initial snaphot of exchnages and apllying the diff is actually the right thing to do for Binance, and since we are doing it also for Bitstamp
+
 Grcp server/client
 https://github.com/hyperium/tonic/blob/master/examples/routeguide-tutorial.md
 https://kevinhoffman.medium.com/streaming-grpc-with-rust-d978fece5ef6

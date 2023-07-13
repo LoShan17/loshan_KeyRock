@@ -1,4 +1,4 @@
-use loshan_keyrock::exchanges::{get_all_streams, get_binance_snapshot, get_bitstamp_snapshot};
+use loshan_keyrock::exchanges::{ParsedUpdate, get_all_streams, get_binance_snapshot, get_bitstamp_snapshot, binance_json_to_levels, bitstamp_json_to_levels};
 use loshan_keyrock::orderbookaggregator::{Level, Summary};
 
 use futures::{SinkExt, StreamExt}; //, TryFutureExt};
@@ -7,6 +7,8 @@ use tokio_tungstenite::{connect_async, tungstenite::Message, MaybeTlsStream, Web
 use anyhow::{Context, Result};
 use serde_json;
 
+
+// maybe at some point worth renaming this server and adding a client to consume the grpc stream
 
 #[tokio::main]
 async fn main() -> Result<()>{
@@ -25,6 +27,25 @@ async fn main() -> Result<()>{
         println!("UPDATE RECEIVED");
         println!("{}", key);
         println!("{}", message_value);
+        println!("{}", message_value["asks"]);
+        println!("{}", message_value["bids"]);
+
+        let parsed_update = match key {
+            "BINANCE" => {binance_json_to_levels(message_value).expect("error in binance json value to updates")}
+            "BITSTAMP" => {
+                let value_data = &message_value["data"];
+                if value_data.as_array().context("failed value into array")?.len() > 1 {
+                    bitstamp_json_to_levels(value_data).expect("error in bitstamp json value to updates")
+                }
+                else {
+                    println!("received message with no data, continue");
+                    continue;
+                }
+            }
+            _ => panic!("not implemented exchange")
+        }; 
+        println!("and this is the prsed update");
+        println!("{:?}", parsed_update);
     }
 
     // let read_future = stream_map.for_each(|message| async {
