@@ -1,8 +1,8 @@
 use crate::orderbookaggregator::{Level, Summary};
-use std::collections::HashMap;
 use anyhow::{Context, Result};
+use rust_decimal::{prelude::FromPrimitive, Decimal};
 use serde_json::Value;
-use rust_decimal::{Decimal, prelude::FromPrimitive};
+use std::collections::HashMap;
 
 #[derive(Debug, Default)]
 pub struct OrderBook {
@@ -13,23 +13,20 @@ pub struct OrderBook {
     best_bid_price: u32,
     best_ask_price: u32,
     bid_prices_reference: Vec<HashMap<&'static str, Level>>,
-    ask_prices_reference: Vec<HashMap<&'static str, Level>>
+    ask_prices_reference: Vec<HashMap<&'static str, Level>>,
 }
 
 impl OrderBook {
-
     pub fn new(symbol: String, levels: u32, snapshots: Vec<Value>) -> Result<Self> {
-
         let best_bid_price: u32 = 10;
         let best_ask_price: u32 = 12;
-        
+
         let snapshot = &snapshots[0];
         let one_level = Level {
             price: 10.00,
             amount: 0.5,
             exchange: "BITSTAMP".to_string(),
         };
-
 
         let two_level = Level {
             price: 10.00,
@@ -51,7 +48,7 @@ impl OrderBook {
             best_bid_price,
             best_ask_price,
             bid_prices_reference,
-            ask_prices_reference    
+            ask_prices_reference,
         };
 
         Ok(order_book)
@@ -62,11 +59,10 @@ impl OrderBook {
     }
 
     pub fn get_bids_levels() -> Result<Vec<Level>> {
-        unimplemented!()   
+        unimplemented!()
     }
 
     pub fn get_summary(&self) -> Result<Summary> {
         unimplemented!()
-
     }
 }
