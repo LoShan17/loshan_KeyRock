@@ -21,4 +21,3 @@ notes explaining how to take an initial snaphot of exchnages and apllying the di
 
 Grcp server/client
 https://github.com/hyperium/tonic/blob/master/examples/routeguide-tutorial.md
-https://kevinhoffman.medium.com/streaming-grpc-with-rust-d978fece5ef6

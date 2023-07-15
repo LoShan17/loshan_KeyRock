@@ -2,20 +2,20 @@ use crate::orderbookaggregator::Level;
 use anyhow::{Context, Result};
 use futures::stream::SplitStream;
 use futures::{SinkExt, StreamExt}; //, TryFutureExt};
-use prost::encoding::message;
+                                   // use prost::encoding::message;
 use reqwest;
 use serde_json::Value;
 use tokio::net::TcpStream;
 use tokio_stream::StreamMap;
 use tokio_tungstenite::{connect_async, tungstenite::Message, MaybeTlsStream, WebSocketStream};
-use tonic::{transport::Server, Status};
+// use tonic::{transport::Server, Status};
 
 // const EXCHANGES:Vec<String> = vec!["BINANCE".to_string(), "BITSTAMP".to_string()];
 #[derive(Debug, Default)]
 pub struct ParsedUpdate {
-    bids: Vec<Level>,
-    asks: Vec<Level>,
-    last_update_id: u64,
+    pub bids: Vec<Level>,
+    pub asks: Vec<Level>,
+    pub last_update_id: u64,
 }
 // OK
 pub async fn get_bitstamp_snapshot(symbol: &String) -> Result<String> {
@@ -99,7 +99,7 @@ pub async fn get_bitstamp_stream(
 
 // TODO: do this full implementation
 pub async fn get_all_streams(
-    symbol: String,
+    symbol: &String,
 ) -> Result<StreamMap<&'static str, SplitStream<WebSocketStream<MaybeTlsStream<TcpStream>>>>> {
     let mut streams_map = StreamMap::new();
 
@@ -111,10 +111,10 @@ pub async fn get_all_streams(
 
     // }
 
-    let binance_stream_read = get_binance_stream(&symbol).await.unwrap();
+    let binance_stream_read = get_binance_stream(symbol).await.unwrap();
     streams_map.insert("BINANCE", binance_stream_read);
 
-    let bitstamp_stream_read = get_bitstamp_stream(&symbol).await.unwrap();
+    let bitstamp_stream_read = get_bitstamp_stream(symbol).await.unwrap();
     streams_map.insert("BITSTAMP", bitstamp_stream_read);
 
     println!("all streams returning");

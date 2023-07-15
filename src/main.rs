@@ -2,6 +2,7 @@ use loshan_keyrock::exchanges::{
     binance_json_to_levels, bitstamp_json_to_levels, get_all_streams, get_binance_snapshot,
     get_bitstamp_snapshot, ParsedUpdate,
 };
+use loshan_keyrock::orderbook::OrderBook;
 use loshan_keyrock::orderbookaggregator::{Level, Summary};
 
 use anyhow::{Context, Result};
@@ -21,7 +22,7 @@ async fn main() -> Result<()> {
     // let ws_read_stream = get_bitstamp_stream(&symbol).await.context("Error in getting bistamp stream").unwrap();
 
     // let ws_read_stream = get_binance_stream(&symbol).await.context("Error in getting bistamp stream").unwrap();
-    let mut stream_map = get_all_streams(symbol).await.unwrap();
+    let mut stream_map = get_all_streams(&symbol).await.unwrap();
     while let Some((key, message)) = stream_map.next().await {
         let message = message.map_err(|_| Status::internal("Failed to get message"))?;
 
@@ -54,25 +55,19 @@ async fn main() -> Result<()> {
             }
             _ => panic!("not implemented exchange"),
         };
+
         println!("and this is the prsed update");
         println!("{:?}", parsed_update);
+
+        let order_book = OrderBook::new(symbol.clone(), 10, parsed_update)
+            .expect("failed to create new orderbook");
+        println!("{:?}", order_book);
     }
-
-    // let read_future = stream_map.for_each(|message| async {
-    //     println!("receiving...");
-    //     let unwrapped_message = message.unwrap();
-    //      //let data = unwrapped_message.into_data();
-    //      let msg_str = unwrapped_message.into_text().unwrap();
-    //      // tokio::io::stdout().write(&data).await.unwrap();
-    //      println!("{}", msg_str);
-    //      println!("received...");
-    // });
-
-    // read_future.await;
 
     Ok(())
 }
 
+// this is still usefull as to ninitialize the order book befor start consuming updates
 // // Working single queries snapshots
 // #[tokio::main]
 // async fn main() {
