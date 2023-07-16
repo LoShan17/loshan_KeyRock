@@ -21,3 +21,6 @@ notes explaining how to take an initial snaphot of exchnages and apllying the di
 
 Grcp server/client
 https://github.com/hyperium/tonic/blob/master/examples/routeguide-tutorial.md
+
+Tests
+https://doc.rust-lang.org/rust-by-example/testing/unit_testing.html#:~:text=The%20bodies%20of%20test%20functions,in%20the%20test%20function%20panics.

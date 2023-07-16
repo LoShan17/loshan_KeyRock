@@ -180,7 +180,7 @@ pub fn bitstamp_json_to_levels(value: &Value) -> Result<ParsedUpdate> {
                 .context("bitstampask amount failed as string")?
                 .parse::<f64>()
                 .context("bitstamp ask amount failed as float")?,
-            exchange: "BINANCE".to_string(),
+            exchange: "BITSTAMP".to_string(),
         };
         vector_of_asks.insert(0, level);
     }
@@ -239,6 +239,7 @@ pub fn binance_json_to_levels(value: Value) -> Result<ParsedUpdate> {
                 .context("binance ask amount failed as float")?,
             exchange: "BINANCE".to_string(),
         };
+        // are these inserts correct vs index 0
         vector_of_asks.insert(0, level);
     }
 
