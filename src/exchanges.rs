@@ -17,7 +17,7 @@ pub struct ParsedUpdate {
     pub asks: Vec<Level>,
     pub last_update_id: u64,
 }
-// OK
+// OK, these 2 below works but must be changed to return PrasedUpadete of Levels to initialize the book
 pub async fn get_bitstamp_snapshot(symbol: &String) -> Result<String> {
     let url = format!(
         "https://www.bitstamp.net/api/v2/order_book/{}/",

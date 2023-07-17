@@ -3,13 +3,13 @@ use loshan_keyrock::exchanges::{
     get_bitstamp_snapshot, ParsedUpdate,
 };
 use loshan_keyrock::orderbook::OrderBook;
-use loshan_keyrock::orderbookaggregator::{Level, Summary};
+// use loshan_keyrock::orderbookaggregator::{Level, Summary};
 
 use anyhow::{Context, Result};
-use futures::{SinkExt, StreamExt}; //, TryFutureExt};
+use futures::StreamExt; //, TryFutureExt}; {SinkExt,
 use serde_json;
-use tokio_tungstenite::{connect_async, tungstenite::Message, MaybeTlsStream, WebSocketStream};
-use tonic::{transport::Server, Status};
+// use tokio_tungstenite::{connect_async, tungstenite::Message, MaybeTlsStream, WebSocketStream};
+use tonic::Status; //{transport::Server,
 
 // maybe at some point worth renaming this server and adding a client to consume the grpc stream
 
@@ -57,6 +57,7 @@ async fn main() -> Result<()> {
         };
 
         println!("and this is the prsed update");
+
         println!("{:?}", parsed_update);
 
         let order_book = OrderBook::new(symbol.clone(), 10, parsed_update)

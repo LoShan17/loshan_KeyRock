@@ -1,12 +1,9 @@
 use crate::exchanges::ParsedUpdate;
 use crate::orderbookaggregator::{Level, Summary};
-use anyhow::{Context, Result};
+use anyhow::Result; // {Context,
 use rust_decimal::{prelude::FromPrimitive, Decimal};
-use serde_json::Value;
-use std::{
-    collections::HashMap,
-    ops::{Mul, Sub},
-};
+// use serde_json::Value;
+use std::collections::HashMap;
 
 #[derive(Debug, Default)]
 pub struct OrderBook {
@@ -17,7 +14,7 @@ pub struct OrderBook {
     // any lookup integer to retrieve from the main array in O(1)
     // is going to be stored as usize as that seems to be the correct way
     symbol: String,
-    best_bid_price: usize,
+    best_bid_price: usize, // currently these are storeed and kept as usize
     best_ask_price: usize,
     // vector of maps with exchange name as key string and corresponding level
     // for now the entry itself is the usize price entry
@@ -34,7 +31,7 @@ impl OrderBook {
     pub fn new(symbol: String, reporting_levels: u32, parsed_update: ParsedUpdate) -> Result<Self> {
         // two random potential values from btcusdt for now
         let best_bid_price: usize = 0;
-        let best_ask_price: usize = 30000 as usize;
+        let best_ask_price: usize = 30000 as usize; // random starting value, remember to change this
 
         // let mut bid_prices_reference: Vec<HashMap<String, Level>> = Vec::with_capacity(best_ask_price as usize * 3);
         // let mut ask_prices_reference: Vec<HashMap<String, Level>> = Vec::with_capacity(best_ask_price as usize * 3);
@@ -96,38 +93,66 @@ impl OrderBook {
             return Ok(());
         }
 
+        // sort these two loops below? worth it?
         for bid in parsed_update.bids {
-            // parsed_update.last_update_id contains the timestamp to be compared against
-            // let exchange = bid.exchange.clone();
-            let price_position = self.price_to_price_array_index(bid.price);
-            let mut ref_map = self.bid_prices_reference.remove(price_position);
-            // put logic here to remove if volume is zero...
-            // let exchange = bid.exchange;
-            ref_map.insert(bid.exchange.clone(), bid);
-            self.bid_prices_reference[price_position] = ref_map;
+            self.merge_bid(bid)?
+        }
+
+        for ask in parsed_update.asks {
+            self.merge_ask(ask)?
+        }
+
+        return Ok(());
+    }
+
+    pub fn merge_bid(&mut self, level: Level) -> Result<()> {
+        // parsed_update.last_update_id contains the timestamp to be compared against
+        // let exchange = bid.exchange.clone();
+        let price_position = self.price_to_price_array_index(level.price);
+        let mut ref_map = self.bid_prices_reference.remove(price_position);
+
+        // if amount is 0 remove the level for the exchange
+        // find a new lower bid available for the top of the book best_bid_prices
+        if level.amount as u32 == 0 {
+            ref_map.remove(&level.exchange);
+            if price_position == self.best_bid_price {
+                let mut next_bid = price_position - 1;
+                loop {
+                    // wrong this condition is wrong it should get the best of the 2
+                    if self.bid_prices_reference[next_bid].contains_key(&level.exchange) {
+                        self.best_ask_price = self.price_to_price_array_index(
+                            self.bid_prices_reference[next_bid]
+                                .get(&level.exchange)
+                                .unwrap()
+                                .price,
+                        );
+                        break;
+                    }
+                    next_bid -= 1;
+                }
+            }
+        } else {
+            ref_map.insert(level.exchange.clone(), level);
             if price_position > self.best_bid_price {
                 self.best_bid_price = price_position
             }
         }
 
-        for ask in parsed_update.asks {
-            let price_position = self.price_to_price_array_index(ask.price);
-            let mut ref_map = self.ask_prices_reference.remove(price_position);
-            ref_map.insert(ask.exchange.clone(), ask);
-            self.ask_prices_reference[price_position] = ref_map;
-            if price_position < self.best_ask_price {
-                self.best_ask_price = price_position
-            }
-        }
+        self.bid_prices_reference[price_position] = ref_map;
+
         return Ok(());
     }
 
-    pub fn merge_bid(level: Level) {
-        unimplemented!()
-    }
+    pub fn merge_ask(&mut self, level: Level) -> Result<()> {
+        let price_position = self.price_to_price_array_index(level.price);
+        let mut ref_map = self.ask_prices_reference.remove(price_position);
+        ref_map.insert(level.exchange.clone(), level);
+        self.ask_prices_reference[price_position] = ref_map;
+        if price_position < self.best_ask_price {
+            self.best_ask_price = price_position
+        }
 
-    pub fn merge_ask(level: Level) {
-        unimplemented!()
+        return Ok(());
     }
 
     pub fn get_asks_reporting_levels(&self) -> Result<Vec<Level>> {
@@ -151,7 +176,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn it_creates_an_orderbook() {
+    fn creates_an_orderbook() {
         let symbol = "BTCUSD".to_string();
         let snapshots = ParsedUpdate {
             last_update_id: 100000,
@@ -176,6 +201,94 @@ mod tests {
         let ob = OrderBook::new(symbol, 5, snapshots).unwrap();
         assert_eq!(ob.best_ask_price, 1000);
         assert_eq!(ob.best_bid_price, 800);
+    }
+
+    #[test]
+    fn creates_an_orderbook_and_deletes_best_bid() {
+        let symbol = "BTCUSD".to_string();
+        let snapshots = ParsedUpdate {
+            last_update_id: 110000, // make it newer update
+            bids: vec![
+                Level {
+                    price: 7.0,
+                    amount: 1.0,
+                    exchange: "BITSTAMP".to_string(),
+                },
+                Level {
+                    price: 8.0,
+                    amount: 0.0,
+                    exchange: "BITSTAMP".to_string(),
+                },
+            ],
+            asks: vec![Level {
+                price: 10.0,
+                amount: 1.0,
+                exchange: "BITSTAMP".to_string(),
+            }],
+        };
+        let mut ob = OrderBook::new(symbol, 5, snapshots).unwrap();
+        let new_update = ParsedUpdate {
+            last_update_id: 110000,
+            bids: vec![
+                Level {
+                    price: 8.0,
+                    amount: 0.0,
+                    exchange: "BITSTAMP".to_string(),
+                },
+            ],
+            asks: vec![Level {
+                price: 11.0,
+                amount: 1.0,
+                exchange: "BITSTAMP".to_string(),
+            }],
+        };
+        ob.merge_parse_update(new_update).expect("broken merge update");
+        assert_eq!(ob.best_ask_price, 1000);
+        assert_eq!(ob.best_bid_price, 700);
+    }
+
+    #[test]
+    fn creates_an_orderbook_and_adds_best_bid() {
+        let symbol = "BTCUSD".to_string();
+        let snapshots = ParsedUpdate {
+            last_update_id: 100000,
+            bids: vec![
+                Level {
+                    price: 7.0,
+                    amount: 1.0,
+                    exchange: "BITSTAMP".to_string(),
+                },
+                Level {
+                    price: 8.0,
+                    amount: 1.0,
+                    exchange: "BITSTAMP".to_string(),
+                },
+            ],
+            asks: vec![Level {
+                price: 10.0,
+                amount: 1.0,
+                exchange: "BITSTAMP".to_string(),
+            }],
+        };
+        let mut ob = OrderBook::new(symbol, 5, snapshots).unwrap();
+        let new_update = ParsedUpdate {
+            last_update_id: 110000,
+            bids: vec![
+                Level {
+                    price: 9.0,
+                    amount: 1.0,
+                    exchange: "BITSTAMP".to_string(),
+                },
+            ],
+            asks: vec![Level {
+                price: 11.0,
+                amount: 1.0,
+                exchange: "BITSTAMP".to_string(),
+            }],
+        };
+        ob.merge_parse_update(new_update).expect("broken merge update");
+        assert_eq!(ob.best_ask_price, 1000);
+        assert_eq!(ob.best_bid_price, 900);
     }
 
     #[test]
