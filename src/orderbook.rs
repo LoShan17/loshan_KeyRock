@@ -181,21 +181,58 @@ impl OrderBook {
     }
 
     // do these and do MVP between tonight and tomorrow early morning!!!!s
-    pub fn get_asks_reporting_levels(&self) -> Result<Vec<Level>> {
-        // get top 10 asks
-        unimplemented!()
+    pub fn get_asks_reporting_levels(&mut self) -> Result<Vec<Level>> {
+        let mut selected_ask: Vec<Level> = Vec::new();
+        let mut count = self.reporting_levels;
+        let mut price_index = self.best_ask_price;
+
+        'populate_asks_levels: loop {
+            let mut sorted_levels: Vec<_> = self.ask_prices_reference[price_index].iter().collect();
+            sorted_levels.sort_by_key(|x: &(&String, &Level)| x.1.amount as u128);
+            // sorted_levels.reverse(); easy way to reverse the ordering if needed
+            for (_, level) in sorted_levels{
+                selected_ask.push(level.clone());
+                count += 1;
+                if count == self.reporting_levels {
+                    break 'populate_asks_levels;
+                }
+                price_index += 1
+            }
+            
+        }
+        return Ok(selected_ask);
     }
 
-    pub fn get_bids_reporting_levels(&self) -> Result<Vec<Level>> {
-        // get top 10 bids
-        unimplemented!()
+    pub fn get_bids_reporting_levels(&mut self) -> Result<Vec<Level>> {
+        let mut selected_bids: Vec<Level> = Vec::new();
+        let mut count = self.reporting_levels;
+        let mut price_index = self.best_bid_price;
+
+        'populate_asks_levels: loop {
+            let mut sorted_levels: Vec<_> = self.bid_prices_reference[price_index].iter().collect();
+            sorted_levels.sort_by_key(|x: &(&String, &Level)| x.1.amount as u128);
+            // sorted_levels.reverse(); easy way to reverse the ordering if needed
+            for (_, level) in sorted_levels{
+                selected_bids.push(level.clone());
+                count += 1;
+                if count == self.reporting_levels {
+                    break 'populate_asks_levels;
+                }
+                price_index -= 1
+            }
+        }
+        return Ok(selected_bids);
     }
 
-    pub fn get_summary(&self) -> Result<Summary> {
-        // get the top 10 summary levels
-        unimplemented!()
+    pub fn get_summary(&mut self) -> Result<Summary> {
+        let bids = self.get_bids_reporting_levels()?;
+        let asks = self.get_asks_reporting_levels()?;
+        return  Ok(Summary {spread: (self.best_ask_price - self.best_bid_price) as f64, bids, asks});
     }
 }
+
+
+// Tests start here
 
 #[cfg(test)]
 mod tests {
