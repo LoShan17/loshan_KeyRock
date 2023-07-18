@@ -6,6 +6,18 @@ use rust_decimal::{prelude::FromPrimitive, Decimal};
 use std::collections::BTreeMap;
 use std::collections::HashMap;
 
+// main method to transform a float price into it's array index equivalent
+pub fn price_to_price_map_index(price: f64) -> usize {
+    let price_index =
+        Decimal::from_f64(price * 100.0).expect("Decimal failed to parse f64 for price");
+    return price_index.mantissa() as usize;
+}
+
+pub fn volume_to_volume_mantissa(volume: f64) -> u32 {
+    let price_index = Decimal::from_f64(volume).expect("Decimal failed to parse f64 for volume");
+    return price_index.mantissa() as u32;
+}
+
 #[derive(Debug, Default)]
 pub struct OrderBook {
     // The idea is storing price points in a vector for each side of the book
@@ -70,12 +82,6 @@ impl OrderBook {
         Ok(order_book)
     }
 
-    // main method to transform a float price into it's array index equivalent
-    fn price_to_price_map_index(&self, price: f64) -> usize {
-        let price_index = Decimal::from_f64(price * 100.0).expect("Decimal failed to parse f64");
-        price_index.mantissa() as usize
-    }
-
     pub fn merge_parse_update(&mut self, parsed_update: ParsedUpdate) -> Result<()> {
         // this firt checks if for a given exchange we have a last_update_id timestmp
         // higher than current, if not simply returns Ok(())
@@ -106,13 +112,13 @@ impl OrderBook {
     }
 
     pub fn merge_bid(&mut self, level: Level) -> Result<()> {
-        let price_position = self.price_to_price_map_index(level.price);
+        let price_position = price_to_price_map_index(level.price);
         let ref_map = self
             .bid_prices_reference
             .entry(price_position)
             .or_insert(HashMap::new());
 
-        if level.amount as u32 == 0 {
+        if volume_to_volume_mantissa(level.amount) == 0 {
             ref_map.remove(&level.exchange);
             if (price_position == self.best_bid_price) && (ref_map.len() == 0) {
                 for (next_price_index, next_exchange_map) in self.bid_prices_reference.iter().rev()
@@ -135,13 +141,13 @@ impl OrderBook {
     }
 
     pub fn merge_ask(&mut self, level: Level) -> Result<()> {
-        let price_position = self.price_to_price_map_index(level.price);
+        let price_position = price_to_price_map_index(level.price);
         let ref_map = self
             .ask_prices_reference
             .entry(price_position)
             .or_insert(HashMap::new());
 
-        if level.amount as u32 == 0 {
+        if volume_to_volume_mantissa(level.amount) == 0 {
             ref_map.remove(&level.exchange);
             if (price_position == self.best_ask_price) && (ref_map.len() == 0) {
                 for (next_price_index, next_exchange_map) in self.ask_prices_reference.iter() {
@@ -206,7 +212,7 @@ impl OrderBook {
         let bids = self.get_bids_reporting_levels()?;
         let asks = self.get_asks_reporting_levels()?;
         return Ok(Summary {
-            spread: (self.best_ask_price - self.best_bid_price) as f64,
+            spread: (self.best_ask_price as f64 / 100.0 - self.best_bid_price as f64 / 100.0),
             bids,
             asks,
         });
