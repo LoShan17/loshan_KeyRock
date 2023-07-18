@@ -3,6 +3,7 @@ use crate::orderbookaggregator::{Level, Summary};
 use anyhow::Result; // {Context,
 use rust_decimal::{prelude::FromPrimitive, Decimal};
 // use serde_json::Value;
+use std::collections::BTreeMap;
 use std::collections::HashMap;
 
 #[derive(Debug, Default)]
@@ -13,13 +14,13 @@ pub struct OrderBook {
 
     // any lookup integer to retrieve from the main array in O(1)
     // is going to be stored as usize as that seems to be the correct way
-    symbol: String,
+    // symbol: String, // this is probably not needed, delete it
     best_bid_price: usize, // currently these are storeed and kept as usize
     best_ask_price: usize,
     // vector of maps with exchange name as key string and corresponding level
-    // for now the entry itself is the usize price entry
-    bid_prices_reference: Vec<HashMap<String, Level>>,
-    ask_prices_reference: Vec<HashMap<String, Level>>,
+    // for now the entry itself is the usize price entry, chnaging this into hash maps of hash maps?
+    bid_prices_reference: BTreeMap<usize, HashMap<String, Level>>,
+    ask_prices_reference: BTreeMap<usize, HashMap<String, Level>>,
     reporting_levels: u32, // to be set as a parmater
     last_update_ids: HashMap<String, u64>,
 }
@@ -31,24 +32,23 @@ impl OrderBook {
     pub fn new(symbol: String, reporting_levels: u32, parsed_update: ParsedUpdate) -> Result<Self> {
         // two random potential values from btcusdt for now
         let best_bid_price: usize = 0;
-        let best_ask_price: usize = 30000 as usize; // random starting value, remember to change this
+        let best_ask_price: usize = usize::MAX; // random starting value, remember to change this
 
         // let mut bid_prices_reference: Vec<HashMap<String, Level>> = Vec::with_capacity(best_ask_price as usize * 3);
         // let mut ask_prices_reference: Vec<HashMap<String, Level>> = Vec::with_capacity(best_ask_price as usize * 3);
 
         // this maybe very space intensive (I don't know, double check)
         // but at least it makes it straightforward and clearer to read and understand
-        let bid_prices_reference: Vec<HashMap<String, Level>> =
-            vec![HashMap::new(); best_ask_price as usize * 3];
-        let ask_prices_reference: Vec<HashMap<String, Level>> =
-            vec![HashMap::new(); best_ask_price as usize * 3];
+        // this thing is horribly ineficient -> change to collections::BTreeMapCopy, which represents a sorted Map
+        let bid_prices_reference: BTreeMap<usize, HashMap<String, Level>> = BTreeMap::new();
+        let ask_prices_reference: BTreeMap<usize, HashMap<String, Level>> = BTreeMap::new();
 
         let mut last_update_ids = HashMap::new(); // to be kept with latest update from each exchange
         last_update_ids.insert("BINANCE".to_string(), 1);
         last_update_ids.insert("BITSTAMP".to_string(), 1);
 
         let mut order_book = Self {
-            symbol: symbol.clone(),
+            // symbol: symbol.clone(),
             best_bid_price,
             best_ask_price,
             bid_prices_reference,
@@ -71,7 +71,7 @@ impl OrderBook {
     }
 
     // main method to transform a float price into it's array index equivalent
-    fn price_to_price_array_index(&self, price: f64) -> usize {
+    fn price_to_price_map_index(&self, price: f64) -> usize {
         let price_index = Decimal::from_f64(price * 100.0).expect("Decimal failed to parse f64");
         price_index.mantissa() as usize
     }
@@ -106,30 +106,21 @@ impl OrderBook {
     }
 
     pub fn merge_bid(&mut self, level: Level) -> Result<()> {
-        // parsed_update.last_update_id contains the timestamp to be compared against
-        // let exchange = bid.exchange.clone();
-        let price_position = self.price_to_price_array_index(level.price);
-        let mut ref_map = self.bid_prices_reference.remove(price_position);
+        let price_position = self.price_to_price_map_index(level.price);
+        let ref_map = self
+            .bid_prices_reference
+            .entry(price_position)
+            .or_insert(HashMap::new());
 
-        // if amount is 0 remove the level for the exchange
-        // find a new lower bid available for the top of the book best_bid_prices
         if level.amount as u32 == 0 {
             ref_map.remove(&level.exchange);
-            if price_position == self.best_bid_price {
-                let mut next_bid = price_position; // check at the same level if best still available from other exchanges
-                'search_bid: loop {
-                    // wrong this condition is wrong it should get the best of the 2
-                    // sort this iteration below by volume?
-                    for (exchange, _) in self.bid_prices_reference[next_bid].iter() {
-                        self.best_bid_price = self.price_to_price_array_index(
-                            self.bid_prices_reference[next_bid]
-                                .get(exchange)
-                                .unwrap()
-                                .price,
-                        );
-                        break 'search_bid
+            if (price_position == self.best_bid_price) && (ref_map.len() == 0) {
+                for (next_price_index, next_exchange_map) in self.bid_prices_reference.iter().rev()
+                {
+                    if next_exchange_map.len() > 0 {
+                        self.best_bid_price = *next_price_index;
+                        break;
                     }
-                    next_bid -= 1;
                 }
             }
         } else {
@@ -138,34 +129,26 @@ impl OrderBook {
                 self.best_bid_price = price_position
             }
         }
-
-        self.bid_prices_reference[price_position] = ref_map;
-
+        // this is still useless
+        // self.ask_prices_reference.insert(price_position, *ref_map);
         return Ok(());
     }
 
     pub fn merge_ask(&mut self, level: Level) -> Result<()> {
-
-        let price_position = self.price_to_price_array_index(level.price);
-        let mut ref_map = self.ask_prices_reference.remove(price_position);
+        let price_position = self.price_to_price_map_index(level.price);
+        let ref_map = self
+            .ask_prices_reference
+            .entry(price_position)
+            .or_insert(HashMap::new());
 
         if level.amount as u32 == 0 {
             ref_map.remove(&level.exchange);
-            if price_position == self.best_ask_price {
-                let mut next_ask = price_position; // check at the same level if best still available from other exchanges
-                'search_ask: loop {
-                    // wrong this condition is wrong it should get the best of the 2
-                    // sort this iteration below by volume?
-                    for (exchange, _) in self.ask_prices_reference[next_ask].iter() {
-                        self.best_ask_price = self.price_to_price_array_index(
-                            self.ask_prices_reference[next_ask]
-                                .get(exchange)
-                                .unwrap()
-                                .price,
-                        );
-                        break 'search_ask;
+            if (price_position == self.best_ask_price) && (ref_map.len() == 0) {
+                for (next_price_index, next_exchange_map) in self.ask_prices_reference.iter() {
+                    if next_exchange_map.len() > 0 {
+                        self.best_ask_price = *next_price_index;
+                        break;
                     }
-                    next_ask += 1;
                 }
             }
         } else {
@@ -174,9 +157,8 @@ impl OrderBook {
                 self.best_ask_price = price_position
             }
         }
-
-        self.ask_prices_reference[price_position] = ref_map;
-
+        // this is still useless
+        // self.ask_prices_reference.insert(price_position, *ref_map);
         return Ok(());
     }
 
@@ -184,21 +166,18 @@ impl OrderBook {
     pub fn get_asks_reporting_levels(&mut self) -> Result<Vec<Level>> {
         let mut selected_ask: Vec<Level> = Vec::new();
         let mut count = self.reporting_levels;
-        let mut price_index = self.best_ask_price;
 
-        'populate_asks_levels: loop {
-            let mut sorted_levels: Vec<_> = self.ask_prices_reference[price_index].iter().collect();
-            sorted_levels.sort_by_key(|x: &(&String, &Level)| x.1.amount as u128);
-            // sorted_levels.reverse(); easy way to reverse the ordering if needed
-            for (_, level) in sorted_levels{
+        for (_, exchange_levels_map) in self.ask_prices_reference.iter() {
+            for (_, level) in exchange_levels_map {
                 selected_ask.push(level.clone());
                 count += 1;
                 if count == self.reporting_levels {
-                    break 'populate_asks_levels;
+                    break;
                 }
-                price_index += 1
             }
-            
+            if count == self.reporting_levels {
+                break;
+            }
         }
         return Ok(selected_ask);
     }
@@ -206,19 +185,18 @@ impl OrderBook {
     pub fn get_bids_reporting_levels(&mut self) -> Result<Vec<Level>> {
         let mut selected_bids: Vec<Level> = Vec::new();
         let mut count = self.reporting_levels;
-        let mut price_index = self.best_bid_price;
 
-        'populate_asks_levels: loop {
-            let mut sorted_levels: Vec<_> = self.bid_prices_reference[price_index].iter().collect();
-            sorted_levels.sort_by_key(|x: &(&String, &Level)| x.1.amount as u128);
-            // sorted_levels.reverse(); easy way to reverse the ordering if needed
-            for (_, level) in sorted_levels{
+        // bids should be iterated from larger to smaller so .rev()
+        for (_, exchange_levels_map) in self.bid_prices_reference.iter().rev() {
+            for (_, level) in exchange_levels_map {
                 selected_bids.push(level.clone());
                 count += 1;
                 if count == self.reporting_levels {
-                    break 'populate_asks_levels;
+                    break;
                 }
-                price_index -= 1
+            }
+            if count == self.reporting_levels {
+                break;
             }
         }
         return Ok(selected_bids);
@@ -227,10 +205,13 @@ impl OrderBook {
     pub fn get_summary(&mut self) -> Result<Summary> {
         let bids = self.get_bids_reporting_levels()?;
         let asks = self.get_asks_reporting_levels()?;
-        return  Ok(Summary {spread: (self.best_ask_price - self.best_bid_price) as f64, bids, asks});
+        return Ok(Summary {
+            spread: (self.best_ask_price - self.best_bid_price) as f64,
+            bids,
+            asks,
+        });
     }
 }
-
 
 // Tests start here
 

@@ -3,15 +3,41 @@ use loshan_keyrock::exchanges::{
     get_bitstamp_snapshot, ParsedUpdate,
 };
 use loshan_keyrock::orderbook::OrderBook;
-// use loshan_keyrock::orderbookaggregator::{Level, Summary};
+use loshan_keyrock::orderbookaggregator::{
+    orderbook_aggregator_server::{OrderbookAggregator, OrderbookAggregatorServer},
+    Empty, Summary,
+};
+// use loshan_keyrock::orderbookaggregator::{
+//     orderbook_aggregator_client::OrderbookAggregatorClient, Empty,
+// };
 
 use anyhow::{Context, Result};
 use futures::StreamExt; //, TryFutureExt}; {SinkExt,
 use serde_json;
 // use tokio_tungstenite::{connect_async, tungstenite::Message, MaybeTlsStream, WebSocketStream};
-use tonic::Status; //{transport::Server,
+use futures::Stream;
+use std::pin::Pin;
+use tonic::{Request, Response, Status};
 
-// maybe at some point worth renaming this server and adding a client to consume the grpc stream
+#[derive(Debug)]
+struct OrderbookAggregatorService;
+
+#[tonic::async_trait]
+impl OrderbookAggregator for OrderbookAggregatorService {
+    type BookSummaryStream = Pin<Box<dyn Stream<Item = Result<Summary, Status>> + Send>>;
+
+    async fn book_summary(
+        &self,
+        _request: Request<Empty>,
+    ) -> Result<tonic::Response<Self::BookSummaryStream>, Status> {
+        // let mut ob = OrderBook::new(symbol, reporting_levels, parsed_update);
+
+        // Ok(tonic::Response::new(
+        //     Box::pin(stream) as Self::BookSummaryStream
+        // ))
+        unimplemented!();
+    }
+}
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -60,9 +86,9 @@ async fn main() -> Result<()> {
 
         println!("{:?}", parsed_update);
 
-        let order_book = OrderBook::new(symbol.clone(), 10, parsed_update)
+        let mut order_book = OrderBook::new(symbol.clone(), 10, parsed_update)
             .expect("failed to create new orderbook");
-        println!("{:?}", order_book);
+        println!("{:?}", order_book.get_summary());
     }
 
     Ok(())

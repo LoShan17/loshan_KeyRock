@@ -5,6 +5,14 @@ edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[[bin]]
+name = "orderbook-server"
+path = "src/server.rs"
+
+[[bin]]
+name = "orderbook-client"
+path = "src/client.rs"
+
 [dependencies]
 tokio-tungstenite = { version = "*", features = ["native-tls"] }
 tungstenite = {version = "0.19", default-features = false}

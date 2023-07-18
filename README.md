@@ -1,5 +1,10 @@
 KeyRock Challenge defined as per Rust L2.pdf
 
+cargo run --bin server
+
+and after the server is up and running
+
+cargo run --bin client, to see summaries (as defined in orderbookaggregator.proto) printed to standar output
 
 References use for several topics included below:
 
@@ -10,6 +15,7 @@ https://stackoverflow.com/questions/57756927/rust-modules-confusion-when-there-i
 OrderBook:
 https://sanket.tech/posts/rustbook/
 https://github.com/inv2004/orderbook-rs/blob/master/src/ob.rs
+https://stackoverflow.com/questions/30851464/https://doc.rust-lang.org/std/collections/hash_map/enum.Entry.html
 
 Streams:
 https://github.com/snapview/tokio-tungstenite/issues/137
@@ -19,7 +25,7 @@ https://docs.rs/futures/latest/futures/stream/struct.SplitStream.html
 https://github.com/binance/binance-spot-api-docs/blob/master/web-socket-streams.md
 notes explaining how to take an initial snaphot of exchnages and apllying the diff is actually the right thing to do for Binance, and since we are doing it also for Bitstamp
 
-Grcp server/client
+Grcp server/client streaming example
 https://github.com/hyperium/tonic/blob/master/examples/routeguide-tutorial.md
 
 Tests
