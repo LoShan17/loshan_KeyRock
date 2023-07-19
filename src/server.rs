@@ -1,6 +1,6 @@
 use loshan_keyrock::exchanges::{
     binance_json_to_levels, bitstamp_json_to_levels, get_all_streams, get_binance_snapshot,
-    get_bitstamp_snapshot, ParsedUpdate,
+    get_bitstamp_snapshot,
 };
 use loshan_keyrock::orderbook::OrderBook;
 use loshan_keyrock::orderbookaggregator::{
@@ -41,13 +41,22 @@ impl OrderbookAggregator for OrderbookAggregatorService {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    // careful with binance, apparently btcusd is not btcusd but the correct ticker is btcusdt
+    // careful with binance, apparently btcusd is not provided on stream and there is only btcusdt
     let symbol = "btcusdt".to_string();
 
-    // This works
-    // let ws_read_stream = get_bitstamp_stream(&symbol).await.context("Error in getting bistamp stream").unwrap();
+    // get initial 2 snapshots here
+    // create orderbook and start stream
+    let initial_binance_snaphots = get_binance_snapshot(&symbol)
+        .await
+        .expect("Error i getting ParsedUpdate for BINANCE snapshot");
+    let initial_bitstamp_snapshots = get_bitstamp_snapshot(&symbol)
+        .await
+        .expect("Error i getting ParsedUpdate for BITSTAMP snaphost");
 
-    // let ws_read_stream = get_binance_stream(&symbol).await.context("Error in getting bistamp stream").unwrap();
+    let mut order_book =
+        OrderBook::new(10, initial_binance_snaphots).expect("failed to create new orderbook");
+    _ = order_book.merge_parse_update(initial_bitstamp_snapshots);
+
     let mut stream_map = get_all_streams(&symbol).await.unwrap();
     while let Some((key, message)) = stream_map.next().await {
         let message = message.map_err(|_| Status::internal("Failed to get message"))?;
@@ -85,26 +94,11 @@ async fn main() -> Result<()> {
         println!("and this is the prsed update");
 
         println!("{:?}", parsed_update);
+        println!("");
 
-        let mut order_book = OrderBook::new(symbol.clone(), 10, parsed_update)
-            .expect("failed to create new orderbook");
+        _ = order_book.merge_parse_update(parsed_update);
         println!("{:?}", order_book.get_summary());
     }
 
     Ok(())
 }
-
-// this is still usefull as to ninitialize the order book befor start consuming updates
-// // Working single queries snapshots
-// #[tokio::main]
-// async fn main() {
-//     let symbol = "ethbtc".to_string();
-//     let bitsamp_string_snapshot = get_bitstamp_snapshot(&symbol).await;
-
-//     let binance_string_snapshot = get_binance_snapshot(&symbol).await;
-
-//     println!("{}", &bitsamp_string_snapshot.expect("bitsamp snapshot returned error")[..10000]);
-//     println!("{}", "JUST printed bitstamp".to_string());
-//     println!("{}", binance_string_snapshot.expect("binance snapshot returned error"));
-//     println!("{}", "JUST printed binance".to_string());
-// }

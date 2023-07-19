@@ -20,14 +20,14 @@ pub fn volume_to_volume_mantissa(volume: f64) -> u32 {
 
 #[derive(Debug, Default)]
 pub struct OrderBook {
-    // The idea is storing price points in a vector for each side of the book
+    // The idea is storing price points in a BTreeMap
     // Indexing the price with some integer representation (maybe using Decimal)
     // This will allow O(1) retrieval for any price point
+    // also the BTreeMap is ideal for sice of the price refence and keep tha data sorted
 
     // any lookup integer to retrieve from the main array in O(1)
-    // is going to be stored as usize as that seems to be the correct way
-    // symbol: String, // this is probably not needed, delete it
-    best_bid_price: usize, // currently these are storeed and kept as usize
+    // is going to be stored as usize
+    best_bid_price: usize,
     best_ask_price: usize,
     // vector of maps with exchange name as key string and corresponding level
     // for now the entry itself is the usize price entry, chnaging this into hash maps of hash maps?
@@ -37,11 +37,10 @@ pub struct OrderBook {
     last_update_ids: HashMap<String, u64>,
 }
 
-// symbol - crypto pair as String
 // levels - number of levels to be monitored as u32 (this is for the summary, the orderbook stores anyway everything it receives)
 // ParsedUpdate - struct that cotains 2 vetors of levels (for bids and asks) and a timestamp
 impl OrderBook {
-    pub fn new(symbol: String, reporting_levels: u32, parsed_update: ParsedUpdate) -> Result<Self> {
+    pub fn new(reporting_levels: u32, parsed_update: ParsedUpdate) -> Result<Self> {
         // two random potential values from btcusdt for now
         let best_bid_price: usize = 0;
         let best_ask_price: usize = usize::MAX; // random starting value, remember to change this
@@ -60,7 +59,6 @@ impl OrderBook {
         last_update_ids.insert("BITSTAMP".to_string(), 1);
 
         let mut order_book = Self {
-            // symbol: symbol.clone(),
             best_bid_price,
             best_ask_price,
             bid_prices_reference,
@@ -69,15 +67,8 @@ impl OrderBook {
             last_update_ids,
         };
 
-        // for the moment this kind of logic will keep any update in the reference
+        // for the moment this kind of logic will keep any Level Map
         // even when the quantity is set at zero. and just leve it there
-        // but this will still need to adjust best_bid/ask_prices
-        // possibly looping on what's availabel in teh update
-
-        // refactor into two functions for ask and bid
-        // then call them from a method update o the whole ParsedUpdate
-
-        // the loops also need to keep track of both best ask and best bid available
         order_book.merge_parse_update(parsed_update)?;
         Ok(order_book)
     }
@@ -163,12 +154,9 @@ impl OrderBook {
                 self.best_ask_price = price_position
             }
         }
-        // this is still useless
-        // self.ask_prices_reference.insert(price_position, *ref_map);
         return Ok(());
     }
 
-    // do these and do MVP between tonight and tomorrow early morning!!!!s
     pub fn get_asks_reporting_levels(&mut self) -> Result<Vec<Level>> {
         let mut selected_ask: Vec<Level> = Vec::new();
         let mut count = self.reporting_levels;
@@ -220,14 +208,12 @@ impl OrderBook {
 }
 
 // Tests start here
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn creates_an_orderbook() {
-        let symbol = "BTCUSD".to_string();
         let snapshots = ParsedUpdate {
             last_update_id: 100000,
             bids: vec![Level {
@@ -241,14 +227,13 @@ mod tests {
                 exchange: "BITSTAMP".to_string(),
             }],
         };
-        let ob = OrderBook::new(symbol, 5, snapshots).unwrap();
+        let ob = OrderBook::new(5, snapshots).unwrap();
         assert_eq!(ob.best_ask_price, 1000);
         assert_eq!(ob.best_bid_price, 800);
     }
 
     #[test]
     fn creates_an_orderbook_and_deletes_best_bid_ask() {
-        let symbol = "BTCUSD".to_string();
         let snapshots = ParsedUpdate {
             last_update_id: 100000, // make it newer update
             bids: vec![
@@ -276,7 +261,7 @@ mod tests {
                 },
             ],
         };
-        let mut ob = OrderBook::new(symbol, 5, snapshots).unwrap();
+        let mut ob = OrderBook::new(5, snapshots).unwrap();
         let new_update = ParsedUpdate {
             last_update_id: 110000,
             bids: vec![Level {
@@ -298,7 +283,6 @@ mod tests {
 
     #[test]
     fn creates_an_orderbook_and_adds_best_bid() {
-        let symbol = "BTCUSD".to_string();
         let snapshots = ParsedUpdate {
             last_update_id: 100000,
             bids: vec![
@@ -319,7 +303,7 @@ mod tests {
                 exchange: "BITSTAMP".to_string(),
             }],
         };
-        let mut ob = OrderBook::new(symbol, 5, snapshots).unwrap();
+        let mut ob = OrderBook::new(5, snapshots).unwrap();
         let new_update = ParsedUpdate {
             last_update_id: 110000,
             bids: vec![Level {
@@ -341,7 +325,6 @@ mod tests {
 
     #[test]
     fn already_received_update() {
-        let symbol = "BTCUSD".to_string();
         let snapshots = ParsedUpdate {
             last_update_id: 100000,
             bids: vec![Level {
@@ -355,7 +338,7 @@ mod tests {
                 exchange: "BITSTAMP".to_string(),
             }],
         };
-        let mut ob = OrderBook::new(symbol, 5, snapshots).unwrap();
+        let mut ob = OrderBook::new(5, snapshots).unwrap();
         let new_update = ParsedUpdate {
             last_update_id: 9000,
             bids: vec![Level {
@@ -373,10 +356,5 @@ mod tests {
             .expect("broken merge update");
         assert_eq!(ob.best_ask_price, 1000);
         assert_eq!(ob.best_bid_price, 800);
-    }
-
-    #[test]
-    fn always_working() {
-        assert_eq!(1, 1);
     }
 }

@@ -1,15 +1,14 @@
 use crate::orderbookaggregator::Level;
 use anyhow::{Context, Result};
 use futures::stream::SplitStream;
-use futures::{SinkExt, StreamExt}; //, TryFutureExt};
-                                   // use prost::encoding::message;
+use futures::{SinkExt, StreamExt};
 use reqwest;
 use serde_json::Value;
 use tokio::net::TcpStream;
 use tokio_stream::StreamMap;
 use tokio_tungstenite::{connect_async, tungstenite::Message, MaybeTlsStream, WebSocketStream};
-// use tonic::{transport::Server, Status};
 
+// maybe consider doing this useful?
 // const EXCHANGES:Vec<String> = vec!["BINANCE".to_string(), "BITSTAMP".to_string()];
 #[derive(Debug, Default)]
 pub struct ParsedUpdate {
@@ -18,27 +17,41 @@ pub struct ParsedUpdate {
     pub last_update_id: u64,
 }
 // OK, these 2 below works but must be changed to return PrasedUpadete of Levels to initialize the book
-pub async fn get_bitstamp_snapshot(symbol: &String) -> Result<String> {
+pub async fn get_bitstamp_snapshot(symbol: &String) -> Result<ParsedUpdate> {
     let url = format!(
         "https://www.bitstamp.net/api/v2/order_book/{}/",
         symbol.to_lowercase()
     );
+    println!("{}", url);
+    let request_result = reqwest::get(url).await?;
 
-    let snapshot = reqwest::get(url).await?;
-    let body = snapshot.text().await?;
-    Ok(body)
+    //println!("{}", request_result.text().await?);
+    let message_value = request_result.json::<serde_json::Value>().await?;
+
+    println!("{}", message_value);
+
+    let parsed_update = bitstamp_json_snapshot_to_levels(&message_value);
+    return parsed_update;
 }
 
 // OK
-pub async fn get_binance_snapshot(symbol: &String) -> Result<String> {
+pub async fn get_binance_snapshot(symbol: &String) -> Result<ParsedUpdate> {
     let url = format!(
         "https://www.binance.us/api/v3/depth?symbol={}&limit=1000",
         symbol.to_uppercase()
     );
+    println!("{}", url);
 
-    let snapshot = reqwest::get(url).await?;
-    let body = snapshot.text().await?;
-    Ok(body)
+    let request_result = reqwest::get(url).await?;
+
+    //println!("{}", request_result.text().await?);
+    let message_value = request_result.json::<serde_json::Value>().await?;
+
+    // binance looks good now
+    // println!("{}", message_value);
+
+    let parsed_update = binance_json_to_levels(message_value);
+    return parsed_update;
 }
 
 pub async fn get_binance_stream(
@@ -65,11 +78,6 @@ pub async fn get_bitstamp_stream(
     let (mut ws_stream_bitstamp, _) = connect_async(&ws_url_bitstamp)
         .await
         .context("Failed to connect to bitstamp wss endpoint")?;
-
-    // try these 3?
-    // diff_order_book_[currency_pair]
-    // detail_order_book_[currency_pair]
-    // order_book_[currency_pair]
 
     // from binance https://github.com/binance/binance-spot-api-docs/blob/master/web-socket-streams.md
     // it seems that taking a snapshot and applying the diff feed is the only way.
@@ -117,14 +125,77 @@ pub async fn get_all_streams(
     let bitstamp_stream_read = get_bitstamp_stream(symbol).await.unwrap();
     streams_map.insert("BITSTAMP", bitstamp_stream_read);
 
-    println!("all streams returning");
+    println!("returning both streams for BINANCE and BITSTAMP");
 
     Ok(streams_map)
 }
 
-// for now the idea is simply to return a PrasedUpdate type/ maybe worth switching to HashMap instead of a Vec
-// with lareday as key the u64 from the mantissa of the float price?
-// with Levels as defined under .proto
+// sanpshot seems not to return the outside "data" wrapper in the Json response
+pub fn bitstamp_json_snapshot_to_levels(value: &Value) -> Result<ParsedUpdate> {
+    let mut vector_of_bids: Vec<Level> = Vec::with_capacity(
+        value["bids"]
+            .as_array()
+            .expect("failed to get bids capacity")
+            .len(),
+    );
+    let mut vector_of_asks: Vec<Level> = Vec::with_capacity(
+        value["asks"]
+            .as_array()
+            .expect("failed to get asks capacity")
+            .len(),
+    );
+    let last_update_id = value["microtimestamp"]
+        .as_str()
+        .context("failed to parse microtimestamp as string")?
+        .parse::<u64>()
+        .context(" failed to parse from string to u64")?;
+
+    for bid in value["bids"]
+        .as_array()
+        .context("no array for bids in bitstamp message")?
+    {
+        let level = Level {
+            price: bid[0]
+                .as_str()
+                .context("bitstamp bid price failed as string")?
+                .parse::<f64>()
+                .context("bitstamp bid price failed as float")?,
+            amount: bid[1]
+                .as_str()
+                .context("bitstamp bid amount failed as string")?
+                .parse::<f64>()
+                .context("bitstamp bid amount failed as float")?,
+            exchange: "BITSTAMP".to_string(),
+        };
+        vector_of_bids.insert(0, level);
+    }
+
+    for ask in value["asks"]
+        .as_array()
+        .context("no array for asks in bitsamp message")?
+    {
+        let level = Level {
+            price: ask[0]
+                .as_str()
+                .context("bitstamp ask price failed as string")?
+                .parse::<f64>()
+                .context("bitstamp ask price failed as float")?,
+            amount: ask[1]
+                .as_str()
+                .context("bitstampask amount failed as string")?
+                .parse::<f64>()
+                .context("bitstamp ask amount failed as float")?,
+            exchange: "BITSTAMP".to_string(),
+        };
+        vector_of_asks.insert(0, level);
+    }
+
+    Ok(ParsedUpdate {
+        bids: vector_of_bids,
+        asks: vector_of_asks,
+        last_update_id,
+    })
+}
 
 pub fn bitstamp_json_to_levels(value: &Value) -> Result<ParsedUpdate> {
     let mut vector_of_bids: Vec<Level> = Vec::with_capacity(
@@ -203,9 +274,6 @@ pub fn binance_json_to_levels(value: Value) -> Result<ParsedUpdate> {
         .as_array()
         .context("no array for bids in binance message")?
     {
-        // for number in bid.as_array().context("")? {
-
-        // }
         let level = Level {
             price: bid[0]
                 .as_str()
