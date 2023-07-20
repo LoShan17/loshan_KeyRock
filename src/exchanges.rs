@@ -23,13 +23,10 @@ pub async fn get_bitstamp_snapshot(symbol: &String) -> Result<ParsedUpdate> {
         symbol.to_lowercase()
     );
     println!("{}", url);
+
     let request_result = reqwest::get(url).await?;
-
-    //println!("{}", request_result.text().await?);
     let message_value = request_result.json::<serde_json::Value>().await?;
-
-    println!("{}", message_value);
-
+    // for now just rewritten the parsing function without the ["data"]
     let parsed_update = bitstamp_json_snapshot_to_levels(&message_value);
     return parsed_update;
 }
@@ -43,13 +40,7 @@ pub async fn get_binance_snapshot(symbol: &String) -> Result<ParsedUpdate> {
     println!("{}", url);
 
     let request_result = reqwest::get(url).await?;
-
-    //println!("{}", request_result.text().await?);
     let message_value = request_result.json::<serde_json::Value>().await?;
-
-    // binance looks good now
-    // println!("{}", message_value);
-
     let parsed_update = binance_json_to_levels(message_value);
     return parsed_update;
 }
@@ -264,6 +255,8 @@ pub fn bitstamp_json_to_levels(value: &Value) -> Result<ParsedUpdate> {
 }
 
 pub fn binance_json_to_levels(value: Value) -> Result<ParsedUpdate> {
+    // these can be empty!!!! for example value["bids"]....
+    // this was the kind of message received Ping[ehdhwd]...
     let mut vector_of_bids: Vec<Level> =
         Vec::with_capacity(value["bids"].as_array().unwrap().len());
     let mut vector_of_asks: Vec<Level> =

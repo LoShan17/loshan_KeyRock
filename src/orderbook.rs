@@ -110,6 +110,7 @@ impl OrderBook {
             .or_insert(HashMap::new());
 
         if volume_to_volume_mantissa(level.amount) == 0 {
+            println!("catched volume as zeroooo for bid!!!!");
             ref_map.remove(&level.exchange);
             if (price_position == self.best_bid_price) && (ref_map.len() == 0) {
                 for (next_price_index, next_exchange_map) in self.bid_prices_reference.iter().rev()
@@ -139,6 +140,7 @@ impl OrderBook {
             .or_insert(HashMap::new());
 
         if volume_to_volume_mantissa(level.amount) == 0 {
+            println!("catched volume as zeroooo for ask!!!!");
             ref_map.remove(&level.exchange);
             if (price_position == self.best_ask_price) && (ref_map.len() == 0) {
                 for (next_price_index, next_exchange_map) in self.ask_prices_reference.iter() {
@@ -159,7 +161,7 @@ impl OrderBook {
 
     pub fn get_asks_reporting_levels(&mut self) -> Result<Vec<Level>> {
         let mut selected_ask: Vec<Level> = Vec::new();
-        let mut count = self.reporting_levels;
+        let mut count = 0;
 
         for (_, exchange_levels_map) in self.ask_prices_reference.iter() {
             for (_, level) in exchange_levels_map {
@@ -178,7 +180,7 @@ impl OrderBook {
 
     pub fn get_bids_reporting_levels(&mut self) -> Result<Vec<Level>> {
         let mut selected_bids: Vec<Level> = Vec::new();
-        let mut count = self.reporting_levels;
+        let mut count = 0;
 
         // bids should be iterated from larger to smaller so .rev()
         for (_, exchange_levels_map) in self.bid_prices_reference.iter().rev() {

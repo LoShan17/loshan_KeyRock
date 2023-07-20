@@ -14,6 +14,7 @@ use loshan_keyrock::orderbookaggregator::{
 use anyhow::{Context, Result};
 use futures::StreamExt; //, TryFutureExt}; {SinkExt,
 use serde_json;
+// use crate::serde_json::Error;
 // use tokio_tungstenite::{connect_async, tungstenite::Message, MaybeTlsStream, WebSocketStream};
 use futures::Stream;
 use std::pin::Pin;
@@ -48,10 +49,10 @@ async fn main() -> Result<()> {
     // create orderbook and start stream
     let initial_binance_snaphots = get_binance_snapshot(&symbol)
         .await
-        .expect("Error i getting ParsedUpdate for BINANCE snapshot");
+        .expect("Error getting ParsedUpdate for BINANCE snapshot");
     let initial_bitstamp_snapshots = get_bitstamp_snapshot(&symbol)
         .await
-        .expect("Error i getting ParsedUpdate for BITSTAMP snaphost");
+        .expect("Error getting ParsedUpdate for BITSTAMP snaphost");
 
     let mut order_book =
         OrderBook::new(10, initial_binance_snaphots).expect("failed to create new orderbook");
@@ -61,13 +62,26 @@ async fn main() -> Result<()> {
     while let Some((key, message)) = stream_map.next().await {
         let message = message.map_err(|_| Status::internal("Failed to get message"))?;
 
-        let message_value: serde_json::Value =
-            serde_json::from_slice(&message.into_data()).expect("can't parse");
-        println!("UPDATE RECEIVED");
+        // Ping([]) this is the kind of message breaking the parsing on the json here, so remove these pings!!
         println!("{}", key);
-        println!("{}", message_value);
-        println!("{}", message_value["asks"]);
-        println!("{}", message_value["bids"]);
+        println!("{:?}", message);
+
+        let message = match message {
+            tungstenite::Message::Text(_) => message,
+            // trying to just skip Pings and Pongs messages otherwise they will break parsing
+            tungstenite::Message::Ping(_) => {
+                continue;
+            }
+            tungstenite::Message::Pong(_) => {
+                continue;
+            }
+            _ => {
+                panic!("unknown message received from stream")
+            }
+        };
+
+        let message_value: serde_json::Value =
+            serde_json::from_slice(&message.into_data()).expect("empty message?");
 
         let parsed_update = match key {
             "BINANCE" => binance_json_to_levels(message_value)
@@ -90,14 +104,15 @@ async fn main() -> Result<()> {
             }
             _ => panic!("not implemented exchange"),
         };
-
-        println!("and this is the prsed update");
-
-        println!("{:?}", parsed_update);
-        println!("");
-
         _ = order_book.merge_parse_update(parsed_update);
-        println!("{:?}", order_book.get_summary());
+
+        let summary = order_book.get_summary().expect("broke in creating summary");
+
+        println!("PRINTING SUMMARY");
+        println!("{:?}", summary);
+        println!("length of bids {}", summary.bids.len());
+        println!("length of asks {}", summary.asks.len());
+        println!("END SUMMARY");
     }
 
     Ok(())
