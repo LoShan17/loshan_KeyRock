@@ -62,10 +62,6 @@ async fn main() -> Result<()> {
     while let Some((key, message)) = stream_map.next().await {
         let message = message.map_err(|_| Status::internal("Failed to get message"))?;
 
-        // Ping([]) this is the kind of message breaking the parsing on the json here, so remove these pings!!
-        println!("{}", key);
-        println!("{:?}", message);
-
         let message = match message {
             tungstenite::Message::Text(_) => message,
             // trying to just skip Pings and Pongs messages otherwise they will break parsing

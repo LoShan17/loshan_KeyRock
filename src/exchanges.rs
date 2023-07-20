@@ -255,8 +255,6 @@ pub fn bitstamp_json_to_levels(value: &Value) -> Result<ParsedUpdate> {
 }
 
 pub fn binance_json_to_levels(value: Value) -> Result<ParsedUpdate> {
-    // these can be empty!!!! for example value["bids"]....
-    // this was the kind of message received Ping[ehdhwd]...
     let mut vector_of_bids: Vec<Level> =
         Vec::with_capacity(value["bids"].as_array().unwrap().len());
     let mut vector_of_asks: Vec<Level> =
