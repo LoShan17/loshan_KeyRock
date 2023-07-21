@@ -7,19 +7,12 @@ use loshan_keyrock::orderbookaggregator::{
     orderbook_aggregator_server::{OrderbookAggregator, OrderbookAggregatorServer},
     Empty, Summary,
 };
-// use loshan_keyrock::orderbookaggregator::{
-//     orderbook_aggregator_client::OrderbookAggregatorClient, Empty,
-// };
-
-use anyhow::{Context, Result};
-use futures::StreamExt; //, TryFutureExt}; {SinkExt,
+use anyhow::Result;
+use futures::StreamExt;
 use serde_json;
-// use crate::serde_json::Error;
-// use tokio_tungstenite::{connect_async, tungstenite::Message, MaybeTlsStream, WebSocketStream};
-use async_stream::stream;
 use futures::Stream;
 use std::pin::Pin;
-use tokio::{select, sync::mpsc};
+use tokio::sync::mpsc;
 use tokio_stream::wrappers::UnboundedReceiverStream;
 use tonic::{transport::Server, Request, Status};
 
@@ -61,15 +54,11 @@ impl OrderbookAggregator for OrderbookAggregatorService {
         );
 
         let (sender, receiver) = mpsc::unbounded_channel();
-        //tokio::spawn(async move {
-        //loop {
-        //select! {
-        // start consuming from the streaming
-        // Some((key, message)) = stream_map.next() => {
+
         while let Some((key, message)) = stream_map.next().await {
             let message = message.expect("failed to unwrap message from streams main loop");
 
-            // bunch of printing for debussing purposes, TODO: remove
+            // bunch of printing for debugging purposes, TODO: remove
 
             println!("{}", key);
             println!("this was the message: {}", message);
@@ -119,24 +108,8 @@ impl OrderbookAggregator for OrderbookAggregatorService {
             println!("length of bids {}", summary.bids.len());
             println!("length of asks {}", summary.asks.len());
             println!("END SUMMARY");
-            // yield summary
-            // if let Err(err) = sender.send(Ok(summary)) {
-            //     //tracing::error!("Error sending summary: {:?}", err);
-            //     return Err(Status::internal("Error sending summary"));
-            // }
-            //tx.send(Ok(feature.clone())).await.unwrap();
             _ = sender.send(Ok(summary))
         }
-        // () = sender.closed() => {
-        //     // tracing::info!("Client closed stream");
-        //     // for (_, exchange_stream) in map.iter_mut() {
-        //     //     exchange_stream.close(None).await.map_err(|_| Status::internal("Failed to close stream"))?;
-        //     // }
-        //     return Ok(());
-        // },
-        //}
-        //}
-        //});
         let output = UnboundedReceiverStream::new(receiver);
         Ok(tonic::Response::new(
             Box::pin(output) as Self::BookSummaryStream
