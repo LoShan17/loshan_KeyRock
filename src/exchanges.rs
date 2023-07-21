@@ -16,7 +16,7 @@ pub struct ParsedUpdate {
     pub asks: Vec<Level>,
     pub last_update_id: u64,
 }
-// OK, these 2 below works but must be changed to return PrasedUpadete of Levels to initialize the book
+
 pub async fn get_bitstamp_snapshot(symbol: &String) -> Result<ParsedUpdate> {
     let url = format!(
         "https://www.bitstamp.net/api/v2/order_book/{}/",
@@ -31,7 +31,6 @@ pub async fn get_bitstamp_snapshot(symbol: &String) -> Result<ParsedUpdate> {
     return parsed_update;
 }
 
-// OK
 pub async fn get_binance_snapshot(symbol: &String) -> Result<ParsedUpdate> {
     let url = format!(
         "https://www.binance.us/api/v3/depth?symbol={}&limit=1000",
@@ -50,7 +49,7 @@ pub async fn get_binance_stream(
 ) -> Result<SplitStream<WebSocketStream<MaybeTlsStream<TcpStream>>>> {
     let ws_url_binance = url::Url::parse("wss://stream.binance.us:9443")
         .context("wrong binance url")?
-        .join(&format!("/ws/{}@depth10@100ms", symbol))?;
+        .join(&format!("/ws/{}@depth@100ms", symbol))?;
 
     let (ws_stream_binance, _) = connect_async(&ws_url_binance)
         .await
@@ -77,7 +76,7 @@ pub async fn get_bitstamp_stream(
     let subscribe_msg = serde_json::json!({
         "event": "bts:subscribe",
         "data": {
-            "channel": format!("order_book_{}", symbol)
+            "channel": format!("diff_order_book_{}", symbol)
         }
     });
     println!("{}", subscribe_msg);
@@ -188,6 +187,7 @@ pub fn bitstamp_json_snapshot_to_levels(value: &Value) -> Result<ParsedUpdate> {
     })
 }
 
+// bitstamp maintains exactly the same format between full Book updates and diff feed
 pub fn bitstamp_json_to_levels(value: &Value) -> Result<ParsedUpdate> {
     let mut vector_of_bids: Vec<Level> = Vec::with_capacity(
         value["data"]["bids"]
@@ -282,6 +282,62 @@ pub fn binance_json_to_levels(value: Value) -> Result<ParsedUpdate> {
     }
 
     for ask in value["asks"]
+        .as_array()
+        .context("no array for asks in binance message")?
+    {
+        let level = Level {
+            price: ask[0]
+                .as_str()
+                .context("binance ask price failed as string")?
+                .parse::<f64>()
+                .context("binance ask price failed as float")?,
+            amount: ask[1]
+                .as_str()
+                .context("binance ask amount failed as string")?
+                .parse::<f64>()
+                .context("binance ask amount failed as float")?,
+            exchange: "BINANCE".to_string(),
+        };
+        // are these inserts correct vs index 0
+        vector_of_asks.insert(0, level);
+    }
+
+    Ok(ParsedUpdate {
+        bids: vector_of_bids,
+        asks: vector_of_asks,
+        last_update_id,
+    })
+}
+
+// this is actually quite difference from the one returning the Book snapshots flow
+pub fn binance_diff_json_to_levels(value: Value) -> Result<ParsedUpdate> {
+    let mut vector_of_bids: Vec<Level> =
+        Vec::with_capacity(value["b"].as_array().unwrap().len());
+    let mut vector_of_asks: Vec<Level> =
+        Vec::with_capacity(value["a"].as_array().unwrap().len());
+    let last_update_id = value["E"].as_u64().unwrap();
+
+    for bid in value["b"]
+        .as_array()
+        .context("no array for bids in binance message")?
+    {
+        let level = Level {
+            price: bid[0]
+                .as_str()
+                .context("binance bid price failed as string")?
+                .parse::<f64>()
+                .context("binance bid price failed as float")?,
+            amount: bid[1]
+                .as_str()
+                .context("binance bid amount failed as string")?
+                .parse::<f64>()
+                .context("binance bid amount failed as float")?,
+            exchange: "BINANCE".to_string(),
+        };
+        vector_of_bids.insert(0, level);
+    }
+
+    for ask in value["a"]
         .as_array()
         .context("no array for asks in binance message")?
     {

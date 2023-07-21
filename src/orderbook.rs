@@ -27,14 +27,14 @@ pub struct OrderBook {
 
     // any lookup integer to retrieve from the main array in O(1)
     // is going to be stored as usize
-    best_bid_price: usize,
-    best_ask_price: usize,
+    pub best_bid_price: usize,
+    pub best_ask_price: usize,
     // vector of maps with exchange name as key string and corresponding level
     // for now the entry itself is the usize price entry, chnaging this into hash maps of hash maps?
     bid_prices_reference: BTreeMap<usize, HashMap<String, Level>>,
     ask_prices_reference: BTreeMap<usize, HashMap<String, Level>>,
-    reporting_levels: u32, // to be set as a parmater
-    last_update_ids: HashMap<String, u64>,
+    pub reporting_levels: u32, // to be set as a parmater
+    pub last_update_ids: HashMap<String, u64>,
 }
 
 // levels - number of levels to be monitored as u32 (this is for the summary, the orderbook stores anyway everything it receives)
@@ -76,14 +76,24 @@ impl OrderBook {
     pub fn merge_parse_update(&mut self, parsed_update: ParsedUpdate) -> Result<()> {
         // this firt checks if for a given exchange we have a last_update_id timestmp
         // higher than current, if not simply returns Ok(())
+
+        let exchange_identifier;
+        if parsed_update.bids.len() >= 1 {
+            exchange_identifier = parsed_update.bids[0].exchange.clone();
+        }
+        else {
+            exchange_identifier = parsed_update.asks[0].exchange.clone();
+        }
+        
+        // find a better way to identify exchange instead of hardcoding bids[0]
         if parsed_update.last_update_id
             > *self
                 .last_update_ids
-                .get(&parsed_update.bids[0].exchange.clone())
+                .get(&exchange_identifier)
                 .expect("failed to retrieve last_update_timestamp for exchange")
         {
             self.last_update_ids.insert(
-                parsed_update.bids[0].exchange.clone(),
+                exchange_identifier,
                 parsed_update.last_update_id,
             );
         } else {
