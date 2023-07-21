@@ -52,8 +52,6 @@ impl OrderbookAggregator for OrderbookAggregatorService {
             order_book.best_bid_price, order_book.best_ask_price
         );
 
-        // let (sender, receiver) = mpsc::unbounded_channel();
-
         let output = async_stream::try_stream! {
             while let Some((key, message)) = stream_map.next().await {
                 let message = message.expect("failed to unwrap message from streams main loop");
@@ -108,11 +106,10 @@ impl OrderbookAggregator for OrderbookAggregatorService {
                 println!("length of bids {}", summary.bids.len());
                 println!("length of asks {}", summary.asks.len());
                 println!("END SUMMARY");
-                //_ = sender.send(Ok(summary))
                 yield summary
             }
         };
-        //let output = UnboundedReceiverStream::new(receiver);
+
         Ok(tonic::Response::new(
             Box::pin(output) as Self::BookSummaryStream
         ))
