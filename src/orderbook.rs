@@ -1,18 +1,16 @@
 use crate::exchanges::ParsedUpdate;
 use crate::orderbookaggregator::{Level, Summary};
-use anyhow::Result; // {Context,
+use anyhow::Result;
 use rust_decimal::{prelude::FromPrimitive, Decimal};
-// use serde_json::Value;
 use std::collections::BTreeMap;
 use std::collections::HashMap;
 
-// main method to transform a float price into it's array index equivalent
-// TODO: there is a BUG for items significantly below 1, like 0.00000001
-// maybe worth multiplying all by a very big number
+
 pub fn price_to_price_map_index(price: f64) -> usize {
-    let price_index =
-        Decimal::from_f64(price * 100.0).expect("Decimal failed to parse f64 for price");
-    return price_index.mantissa() as usize;
+    // representing with a very big usize was chosen over decimal for semplicity
+    // and to remove bugs when prices were significantly below 1, like 0.00000001
+    let price_index = (price * 1_000_000_000.0) as usize;
+    return price_index;
 }
 
 pub fn volume_to_volume_mantissa(volume: f64) -> u32 {
@@ -23,16 +21,11 @@ pub fn volume_to_volume_mantissa(volume: f64) -> u32 {
 #[derive(Debug, Default)]
 pub struct OrderBook {
     // The idea is storing price points in a BTreeMap
-    // Indexing the price with some integer representation (maybe using Decimal)
+    // Indexing the price with some integer (usize) representation
     // This will allow O(1) retrieval for any price point
     // also the BTreeMap is ideal for sice of the price refence and keep tha data sorted
-
-    // any lookup integer to retrieve from the main array in O(1)
-    // is going to be stored as usize
     pub best_bid_price: usize,
     pub best_ask_price: usize,
-    // vector of maps with exchange name as key string and corresponding level
-    // for now the entry itself is the usize price entry, chnaging this into hash maps of hash maps?
     bid_prices_reference: BTreeMap<usize, HashMap<String, Level>>,
     ask_prices_reference: BTreeMap<usize, HashMap<String, Level>>,
     pub reporting_levels: u32, // to be set as a parmater
@@ -43,16 +36,9 @@ pub struct OrderBook {
 // ParsedUpdate - struct that cotains 2 vetors of levels (for bids and asks) and a timestamp
 impl OrderBook {
     pub fn new(reporting_levels: u32, parsed_update: ParsedUpdate) -> Result<Self> {
-        // two random potential values from btcusdt for now
         let best_bid_price: usize = 0;
-        let best_ask_price: usize = usize::MAX; // random starting value, remember to change this
+        let best_ask_price: usize = usize::MAX;
 
-        // let mut bid_prices_reference: Vec<HashMap<String, Level>> = Vec::with_capacity(best_ask_price as usize * 3);
-        // let mut ask_prices_reference: Vec<HashMap<String, Level>> = Vec::with_capacity(best_ask_price as usize * 3);
-
-        // this maybe very space intensive (I don't know, double check)
-        // but at least it makes it straightforward and clearer to read and understand
-        // this thing is horribly ineficient -> change to collections::BTreeMapCopy, which represents a sorted Map
         let bid_prices_reference: BTreeMap<usize, HashMap<String, Level>> = BTreeMap::new();
         let ask_prices_reference: BTreeMap<usize, HashMap<String, Level>> = BTreeMap::new();
 
@@ -68,25 +54,19 @@ impl OrderBook {
             reporting_levels,
             last_update_ids,
         };
-
-        // for the moment this kind of logic will keep any Level Map
-        // even when the quantity is set at zero. and just leve it there
         order_book.merge_parse_update(parsed_update)?;
         Ok(order_book)
     }
 
     pub fn merge_parse_update(&mut self, parsed_update: ParsedUpdate) -> Result<()> {
-        // this firt checks if for a given exchange we have a last_update_id timestmp
+        // this first checks if for a given exchange we have a last_update_id timestmp
         // higher than current, if not simply returns Ok(())
-
         let exchange_identifier;
         if parsed_update.bids.len() >= 1 {
             exchange_identifier = parsed_update.bids[0].exchange.clone();
         } else {
             exchange_identifier = parsed_update.asks[0].exchange.clone();
         }
-
-        // find a better way to identify exchange instead of hardcoding bids[0]
         if parsed_update.last_update_id
             > *self
                 .last_update_ids
@@ -99,7 +79,6 @@ impl OrderBook {
             return Ok(());
         }
 
-        // sort these two loops below? worth it?
         for bid in parsed_update.bids {
             self.merge_bid(bid)?
         }
@@ -136,8 +115,6 @@ impl OrderBook {
                 self.best_bid_price = price_position
             }
         }
-        // this is still useless
-        // self.ask_prices_reference.insert(price_position, *ref_map);
         return Ok(());
     }
 
@@ -173,7 +150,9 @@ impl OrderBook {
         let mut count = 0;
 
         for (_, exchange_levels_map) in self.ask_prices_reference.iter() {
-            for (_, level) in exchange_levels_map {
+            let mut sorted_levels: Vec<(&std::string::String, &Level)> = exchange_levels_map.iter().collect();
+            sorted_levels.sort_by(|a, b| b.1.amount.partial_cmp(&a.1.amount).unwrap());
+            for (_, level) in sorted_levels {
                 selected_ask.push(level.clone());
                 count += 1;
                 if count == self.reporting_levels {
@@ -193,7 +172,9 @@ impl OrderBook {
 
         // bids should be iterated from larger to smaller so .rev()
         for (_, exchange_levels_map) in self.bid_prices_reference.iter().rev() {
-            for (_, level) in exchange_levels_map {
+            let mut sorted_levels: Vec<(&std::string::String, &Level)> = exchange_levels_map.iter().collect();
+            sorted_levels.sort_by(|a, b| b.1.amount.partial_cmp(&a.1.amount).unwrap());
+            for (_, level) in sorted_levels {
                 selected_bids.push(level.clone());
                 count += 1;
                 if count == self.reporting_levels {
@@ -211,7 +192,7 @@ impl OrderBook {
         let bids = self.get_bids_reporting_levels()?;
         let asks = self.get_asks_reporting_levels()?;
         return Ok(Summary {
-            spread: (self.best_ask_price as f64 / 100.0 - self.best_bid_price as f64 / 100.0),
+            spread: (self.best_ask_price as f64 / 1_000_000_000.0 - self.best_bid_price as f64 / 1_000_000_000.0),
             bids,
             asks,
         });
