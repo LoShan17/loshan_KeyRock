@@ -5,7 +5,6 @@ use rust_decimal::{prelude::FromPrimitive, Decimal};
 use std::collections::BTreeMap;
 use std::collections::HashMap;
 
-
 pub fn price_to_price_map_index(price: f64) -> usize {
     // representing with a very big usize was chosen over decimal for semplicity
     // and to remove bugs when prices were significantly below 1, like 0.00000001
@@ -150,7 +149,8 @@ impl OrderBook {
         let mut count = 0;
 
         for (_, exchange_levels_map) in self.ask_prices_reference.iter() {
-            let mut sorted_levels: Vec<(&std::string::String, &Level)> = exchange_levels_map.iter().collect();
+            let mut sorted_levels: Vec<(&std::string::String, &Level)> =
+                exchange_levels_map.iter().collect();
             sorted_levels.sort_by(|a, b| b.1.amount.partial_cmp(&a.1.amount).unwrap());
             for (_, level) in sorted_levels {
                 selected_ask.push(level.clone());
@@ -172,7 +172,8 @@ impl OrderBook {
 
         // bids should be iterated from larger to smaller so .rev()
         for (_, exchange_levels_map) in self.bid_prices_reference.iter().rev() {
-            let mut sorted_levels: Vec<(&std::string::String, &Level)> = exchange_levels_map.iter().collect();
+            let mut sorted_levels: Vec<(&std::string::String, &Level)> =
+                exchange_levels_map.iter().collect();
             sorted_levels.sort_by(|a, b| b.1.amount.partial_cmp(&a.1.amount).unwrap());
             for (_, level) in sorted_levels {
                 selected_bids.push(level.clone());
@@ -192,7 +193,8 @@ impl OrderBook {
         let bids = self.get_bids_reporting_levels()?;
         let asks = self.get_asks_reporting_levels()?;
         return Ok(Summary {
-            spread: (self.best_ask_price as f64 / 1_000_000_000.0 - self.best_bid_price as f64 / 1_000_000_000.0),
+            spread: (self.best_ask_price as f64 / 1_000_000_000.0
+                - self.best_bid_price as f64 / 1_000_000_000.0),
             bids,
             asks,
         });

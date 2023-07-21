@@ -6,6 +6,7 @@ use loshan_keyrock::orderbookaggregator::{
 };
 
 // very simple client that prints the stream from the server to std output
+// TODO print nicer
 async fn book_summary_stream(
     mut client: OrderbookAggregatorClient<tonic::transport::Channel>,
 ) -> Result<()> {
