@@ -1,10 +1,10 @@
 KeyRock Challenge defined as per Rust L2.pdf
 
-cargo run --bin server
+cargo run --bin orderbook-server
 
 and after the server is up and running
 
-cargo run --bin client, to see summaries (as defined in orderbookaggregator.proto) printed to standar output
+cargo run --bin orderbook-client, to see summaries (as defined in orderbookaggregator.proto) printed to standar output
 
 References use for several topics included below:
 

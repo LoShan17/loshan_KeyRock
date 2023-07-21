@@ -1,3 +1,7 @@
+use anyhow::Result;
+use async_stream;
+use futures::Stream;
+use futures::StreamExt;
 use loshan_keyrock::exchanges::{
     binance_diff_json_to_levels, bitstamp_json_to_levels, get_all_streams, get_binance_snapshot,
     get_bitstamp_snapshot,
@@ -7,13 +11,8 @@ use loshan_keyrock::orderbookaggregator::{
     orderbook_aggregator_server::{OrderbookAggregator, OrderbookAggregatorServer},
     Empty, Summary,
 };
-use anyhow::Result;
-use futures::StreamExt;
 use serde_json;
-use futures::Stream;
 use std::pin::Pin;
-use tokio::sync::mpsc;
-use tokio_stream::wrappers::UnboundedReceiverStream;
 use tonic::{transport::Server, Request, Status};
 
 #[derive(Debug, Default)]
@@ -53,64 +52,67 @@ impl OrderbookAggregator for OrderbookAggregatorService {
             order_book.best_bid_price, order_book.best_ask_price
         );
 
-        let (sender, receiver) = mpsc::unbounded_channel();
+        // let (sender, receiver) = mpsc::unbounded_channel();
 
-        while let Some((key, message)) = stream_map.next().await {
-            let message = message.expect("failed to unwrap message from streams main loop");
+        let output = async_stream::try_stream! {
+            while let Some((key, message)) = stream_map.next().await {
+                let message = message.expect("failed to unwrap message from streams main loop");
 
-            // bunch of printing for debugging purposes, TODO: remove
+                // bunch of printing for debugging purposes, TODO: remove
 
-            println!("{}", key);
-            println!("this was the message: {}", message);
+                println!("{}", key);
+                println!("this was the message: {}", message);
 
-            let message = match message {
-                tungstenite::Message::Text(_) => message,
-                // trying to just skip Pings and Pongs messages otherwise they will break parsing
-                tungstenite::Message::Ping(_) => {
-                    continue;
-                }
-                tungstenite::Message::Pong(_) => {
-                    continue;
-                }
-                _ => {
-                    panic!("unknown message received from stream")
-                }
-            };
-
-            let message_value: serde_json::Value =
-                serde_json::from_slice(&message.into_data()).expect("empty message?");
-
-            let parsed_update = match key {
-                "BINANCE" => binance_diff_json_to_levels(message_value)
-                    .expect("error in binance json value to updates"),
-                "BITSTAMP" => {
-                    let subscription_event = &message_value["event"];
-
-                    if subscription_event.as_str().unwrap() == "bts:subscription_succeeded" {
-                        println!(
-                            "received subscription confirmation message with no data, continue"
-                        );
+                let message = match message {
+                    tungstenite::Message::Text(_) => message,
+                    // trying to just skip Pings and Pongs messages otherwise they will break parsing
+                    tungstenite::Message::Ping(_) => {
                         continue;
-                    } else {
-                        bitstamp_json_to_levels(&message_value)
-                            .expect("error in bitstamp json value to updates")
                     }
-                }
-                _ => panic!("not implemented exchange"),
-            };
-            _ = order_book.merge_parse_update(parsed_update);
+                    tungstenite::Message::Pong(_) => {
+                        continue;
+                    }
+                    _ => {
+                        panic!("unknown message received from stream")
+                    }
+                };
 
-            let summary = order_book.get_summary().expect("Error in creating summary");
+                let message_value: serde_json::Value =
+                    serde_json::from_slice(&message.into_data()).expect("empty message?");
 
-            // bunch of printing for debussing purposes, TODO: remove
-            println!("PRINTING SUMMARY");
-            println!("{:?}", summary);
-            println!("length of bids {}", summary.bids.len());
-            println!("length of asks {}", summary.asks.len());
-            println!("END SUMMARY");
-            _ = sender.send(Ok(summary))
-        }
-        let output = UnboundedReceiverStream::new(receiver);
+                let parsed_update = match key {
+                    "BINANCE" => binance_diff_json_to_levels(message_value)
+                        .expect("error in binance json value to updates"),
+                    "BITSTAMP" => {
+                        let subscription_event = &message_value["event"];
+
+                        if subscription_event.as_str().unwrap() == "bts:subscription_succeeded" {
+                            println!(
+                                "received subscription confirmation message with no data, continue"
+                            );
+                            continue;
+                        } else {
+                            bitstamp_json_to_levels(&message_value)
+                                .expect("error in bitstamp json value to updates")
+                        }
+                    }
+                    _ => panic!("not implemented exchange"),
+                };
+                _ = order_book.merge_parse_update(parsed_update);
+
+                let summary = order_book.get_summary().expect("Error in creating summary");
+
+                // bunch of printing for debussing purposes, TODO: remove
+                println!("PRINTING SUMMARY");
+                println!("{:?}", summary);
+                println!("length of bids {}", summary.bids.len());
+                println!("length of asks {}", summary.asks.len());
+                println!("END SUMMARY");
+                //_ = sender.send(Ok(summary))
+                yield summary
+            }
+        };
+        //let output = UnboundedReceiverStream::new(receiver);
         Ok(tonic::Response::new(
             Box::pin(output) as Self::BookSummaryStream
         ))

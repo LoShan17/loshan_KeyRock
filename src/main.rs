@@ -4,8 +4,7 @@ use loshan_keyrock::exchanges::{
 }; // binance_json_to_levels this parses the book snapshots from stream not diffs, possibly useless
 use loshan_keyrock::orderbook::OrderBook;
 use loshan_keyrock::orderbookaggregator::{
-    orderbook_aggregator_server::OrderbookAggregator,
-    Empty, Summary,
+    orderbook_aggregator_server::OrderbookAggregator, Empty, Summary,
 };
 // use loshan_keyrock::orderbookaggregator::{
 //     orderbook_aggregator_client::OrderbookAggregatorClient, Empty,
@@ -35,7 +34,6 @@ impl OrderbookAggregator for OrderbookAggregatorService {
         unimplemented!()
     }
 }
-
 
 // TODO: this whole file cna be removed
 // old main loop written while experimenting
