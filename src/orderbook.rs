@@ -7,6 +7,8 @@ use std::collections::BTreeMap;
 use std::collections::HashMap;
 
 // main method to transform a float price into it's array index equivalent
+// TODO: there is a BUG for items significantly below 1, like 0.00000001
+// maybe worth multiplying all by a very big number
 pub fn price_to_price_map_index(price: f64) -> usize {
     let price_index =
         Decimal::from_f64(price * 100.0).expect("Decimal failed to parse f64 for price");
@@ -80,11 +82,10 @@ impl OrderBook {
         let exchange_identifier;
         if parsed_update.bids.len() >= 1 {
             exchange_identifier = parsed_update.bids[0].exchange.clone();
-        }
-        else {
+        } else {
             exchange_identifier = parsed_update.asks[0].exchange.clone();
         }
-        
+
         // find a better way to identify exchange instead of hardcoding bids[0]
         if parsed_update.last_update_id
             > *self
@@ -92,10 +93,8 @@ impl OrderBook {
                 .get(&exchange_identifier)
                 .expect("failed to retrieve last_update_timestamp for exchange")
         {
-            self.last_update_ids.insert(
-                exchange_identifier,
-                parsed_update.last_update_id,
-            );
+            self.last_update_ids
+                .insert(exchange_identifier, parsed_update.last_update_id);
         } else {
             return Ok(());
         }

@@ -26,21 +26,32 @@ pub async fn get_bitstamp_snapshot(symbol: &String) -> Result<ParsedUpdate> {
 
     let request_result = reqwest::get(url).await?;
     let message_value = request_result.json::<serde_json::Value>().await?;
-    // for now just rewritten the parsing function without the ["data"]
+    println!("");
+    println!("binance initial message value");
+    println!("{:?}", message_value);
     let parsed_update = bitstamp_json_snapshot_to_levels(&message_value);
+    println!("");
+    println!("binance initial parsed update");
+    println!("{:?}", parsed_update);
     return parsed_update;
 }
 
 pub async fn get_binance_snapshot(symbol: &String) -> Result<ParsedUpdate> {
     let url = format!(
-        "https://www.binance.us/api/v3/depth?symbol={}&limit=1000",
+        "https://www.binance.us/api/v3/depth?symbol={}&limit=10",
         symbol.to_uppercase()
     );
     println!("{}", url);
 
     let request_result = reqwest::get(url).await?;
     let message_value = request_result.json::<serde_json::Value>().await?;
+    println!("");
+    println!("binance initial message value");
+    println!("{:?}", message_value);
     let parsed_update = binance_json_to_levels(message_value);
+    println!("");
+    println!("binance initial parsed update");
+    println!("{:?}", parsed_update);
     return parsed_update;
 }
 
@@ -311,10 +322,8 @@ pub fn binance_json_to_levels(value: Value) -> Result<ParsedUpdate> {
 
 // this is actually quite difference from the one returning the Book snapshots flow
 pub fn binance_diff_json_to_levels(value: Value) -> Result<ParsedUpdate> {
-    let mut vector_of_bids: Vec<Level> =
-        Vec::with_capacity(value["b"].as_array().unwrap().len());
-    let mut vector_of_asks: Vec<Level> =
-        Vec::with_capacity(value["a"].as_array().unwrap().len());
+    let mut vector_of_bids: Vec<Level> = Vec::with_capacity(value["b"].as_array().unwrap().len());
+    let mut vector_of_asks: Vec<Level> = Vec::with_capacity(value["a"].as_array().unwrap().len());
     let last_update_id = value["E"].as_u64().unwrap();
 
     for bid in value["b"]
