@@ -1,5 +1,6 @@
 use anyhow::Result;
 use clap::Parser;
+use clearscreen;
 use tokio_stream::StreamExt;
 
 use loshan_keyrock::orderbookaggregator::{
@@ -12,7 +13,6 @@ struct Cli {
     levels: u32,
 }
 
-// TODO print nicer
 async fn book_summary_stream(
     mut client: OrderbookAggregatorClient<tonic::transport::Channel>,
     symbol: String,
@@ -22,8 +22,9 @@ async fn book_summary_stream(
 
     let mut stream = client.book_summary(summary_request).await?.into_inner();
     while let Some(summary) = stream.next().await {
+        clearscreen::clear().expect("failed to clear screen");
         match summary {
-            Ok(summary) => println!("\n{:#?}", summary),
+            Ok(summary) => println!("{}", summary), //\n{:#?}
             Err(err) => {
                 return Err(err.into());
             }
@@ -34,8 +35,6 @@ async fn book_summary_stream(
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    // TODO: get order book reporting_levels and crypto pair from command line
-    // pass it into book_summary_stream function and pass it along as part of the request
     let client = OrderbookAggregatorClient::connect("http://127.0.0.1:5001").await?;
 
     let args = Cli::parse();

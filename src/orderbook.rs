@@ -1,9 +1,11 @@
 use crate::exchanges::ParsedUpdate;
 use crate::orderbookaggregator::{Level, Summary};
 use anyhow::Result;
+use colored::Colorize;
 use rust_decimal::{prelude::FromPrimitive, Decimal};
 use std::collections::BTreeMap;
 use std::collections::HashMap;
+use std::fmt;
 
 pub fn price_to_price_map_index(price: f64) -> usize {
     // representing with a very big usize was chosen over decimal for semplicity
@@ -29,6 +31,46 @@ pub struct OrderBook {
     ask_prices_reference: BTreeMap<usize, HashMap<String, Level>>,
     pub reporting_levels: u32, // to be set as a parmater
     pub last_update_ids: HashMap<String, u64>,
+}
+
+// Summary trair to allow pretty printing from orderbook-client
+impl fmt::Display for Summary {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        // Write strictly the first element into the supplied output
+        // stream: `f`. Returns `fmt::Result` which indicates whether the
+        // operation succeeded or failed. Note that `write!` uses syntax which
+        // is very similar to `println!`.
+        // let asks_to_display = format!("{:?}", self.asks);
+        let mut asks_to_display = "".to_owned();
+        for level in self.asks.iter().rev() {
+            let ask_level_to_print = format!(
+                "{}: {} - {}\n",
+                &level.exchange,
+                level.price.to_string().red(),
+                level.amount.to_string().red()
+            );
+            asks_to_display.push_str(&ask_level_to_print)
+        }
+        let mut bids_to_display = "".to_owned();
+        for level in self.bids.iter() {
+            let bid_level_to_print = format!(
+                "{}: {} - {}\n",
+                &level.exchange,
+                level.price.to_string().green(),
+                level.amount.to_string().green()
+            );
+            bids_to_display.push_str(&bid_level_to_print)
+        }
+        // let bids_to_display = format!("{:?}", self.bids);
+        write!(
+            f,
+            "{}: {}\n{}\n{}",
+            "current spread",
+            self.spread.to_string().green(),
+            asks_to_display,
+            bids_to_display
+        )
+    }
 }
 
 // levels - number of levels to be monitored as u32 (this is for the summary, the orderbook stores anyway everything it receives)

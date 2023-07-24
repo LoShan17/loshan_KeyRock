@@ -123,13 +123,13 @@ impl OrderbookAggregator for OrderbookAggregatorService {
 // attempt gRPC server main setup
 #[tokio::main]
 async fn main() -> Result<()> {
-    let addr = "127.0.0.1:5001";
-    println!("Server up and running on {}", addr);
+    let address = "127.0.0.1:5001";
+    println!("Server up and running on {}", address);
 
-    let socket_addr = addr.parse()?;
-    let orderbook = OrderbookAggregatorService::default();
+    let socket_addr = address.parse()?;
+    let orderbook_service = OrderbookAggregatorService::default();
     Server::builder()
-        .add_service(OrderbookAggregatorServer::new(orderbook))
+        .add_service(OrderbookAggregatorServer::new(orderbook_service))
         .serve(socket_addr)
         .await?;
     Ok(())
