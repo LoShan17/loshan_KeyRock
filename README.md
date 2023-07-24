@@ -4,13 +4,15 @@ cargo run --bin orderbook-server
 
 and after the server is up and running
 
-cargo run --bin orderbook-client, to see summaries (as defined in orderbookaggregator.proto) printed to standar output
+cargo run --bin orderbook-client btcusdt 10
+to see summaries (as defined in orderbookaggregator.proto) printed to standar output
 
 References use for several topics included below:
 
 Rust General:
 https://doc.rust-lang.org/cargo/guide/project-layout.html
 https://stackoverflow.com/questions/57756927/rust-modules-confusion-when-there-is-main-rs-and-lib-rs
+https://rust-cli.github.io/book/tutorial/cli-args.html
 
 OrderBook:
 https://sanket.tech/posts/rustbook/
