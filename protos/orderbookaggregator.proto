@@ -1,9 +1,13 @@
 syntax = "proto3";
 package orderbookaggregator;
 service OrderbookAggregator {
-    rpc BookSummary(Empty) returns (stream Summary);
+    rpc BookSummary(SummaryRequest) returns (stream Summary);
 }
 message Empty {}
+message SummaryRequest {
+    uint32 levels = 1;
+    string symbol = 2;
+}
 message Summary {
     double spread = 1;
     repeated Level bids = 2;

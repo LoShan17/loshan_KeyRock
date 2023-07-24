@@ -4,7 +4,7 @@ use loshan_keyrock::exchanges::{
 }; // binance_json_to_levels this parses the book snapshots from stream not diffs, possibly useless
 use loshan_keyrock::orderbook::OrderBook;
 use loshan_keyrock::orderbookaggregator::{
-    orderbook_aggregator_server::OrderbookAggregator, Empty, Summary,
+    orderbook_aggregator_server::OrderbookAggregator, Summary, SummaryRequest,
 };
 // use loshan_keyrock::orderbookaggregator::{
 //     orderbook_aggregator_client::OrderbookAggregatorClient, Empty,
@@ -28,7 +28,7 @@ impl OrderbookAggregator for OrderbookAggregatorService {
 
     async fn book_summary(
         &self,
-        _request: Request<Empty>,
+        request: Request<SummaryRequest>,
     ) -> Result<tonic::Response<Self::BookSummaryStream>, Status> {
         // this is essentially copying and pasting the below, with sending t
         unimplemented!()

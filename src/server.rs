@@ -5,11 +5,11 @@ use futures::StreamExt;
 use loshan_keyrock::exchanges::{
     binance_diff_json_to_levels, bitstamp_json_to_levels, get_all_streams, get_binance_snapshot,
     get_bitstamp_snapshot,
-}; // binance_json_to_levels this parses the book snapshots from stream not diffs, possibly useless
+};
 use loshan_keyrock::orderbook::OrderBook;
 use loshan_keyrock::orderbookaggregator::{
     orderbook_aggregator_server::{OrderbookAggregator, OrderbookAggregatorServer},
-    Empty, Summary,
+    Summary, SummaryRequest,
 };
 use serde_json;
 use std::pin::Pin;
@@ -24,12 +24,16 @@ impl OrderbookAggregator for OrderbookAggregatorService {
 
     async fn book_summary(
         &self,
-        _request: Request<Empty>,
+        request: Request<SummaryRequest>,
     ) -> Result<tonic::Response<Self::BookSummaryStream>, Status> {
-        let symbol = "btcusdt".to_string();
+        // TODO, get both symbol and orderbook reporting_levels from SummaryRequest
+        // let symbol = "ethbtc".to_string();
+        let SummaryRequest { symbol, levels } = request.into_inner();
 
         // create streams before taking the 2 snapshots below
-        let mut stream_map = get_all_streams(&symbol).await.unwrap();
+        let mut stream_map = get_all_streams(&symbol)
+            .await
+            .expect("Error in getting exchenges Streams Map");
 
         // get initial 2 snapshots here
         let initial_binance_snaphots = get_binance_snapshot(&symbol)
@@ -39,8 +43,8 @@ impl OrderbookAggregator for OrderbookAggregatorService {
             .await
             .expect("Error getting ParsedUpdate for BITSTAMP snaphost");
 
-        let mut order_book =
-            OrderBook::new(10, initial_binance_snaphots).expect("failed to create new orderbook");
+        let mut order_book = OrderBook::new(levels, initial_binance_snaphots)
+            .expect("failed to create new orderbook");
         println!("original binance snapshot print");
         println!(
             "bb: {}, ba: {}",
@@ -82,9 +86,9 @@ impl OrderbookAggregator for OrderbookAggregatorService {
                     "BINANCE" => binance_diff_json_to_levels(message_value)
                         .expect("error in binance json value to updates"),
                     "BITSTAMP" => {
-                        let subscription_event = &message_value["event"];
+                        let bitstamp_event = &message_value["event"];
 
-                        if subscription_event.as_str().unwrap() == "bts:subscription_succeeded" {
+                        if bitstamp_event.as_str().expect("error in parsing bitstamp event to string") == "bts:subscription_succeeded" {
                             println!(
                                 "received subscription confirmation message with no data, continue"
                             );

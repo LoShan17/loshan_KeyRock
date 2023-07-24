@@ -222,8 +222,8 @@ mod tests {
             }],
         };
         let ob = OrderBook::new(5, snapshots).unwrap();
-        assert_eq!(ob.best_ask_price, 1000);
-        assert_eq!(ob.best_bid_price, 800);
+        assert_eq!(ob.best_ask_price, price_to_price_map_index(10.0));
+        assert_eq!(ob.best_bid_price, price_to_price_map_index(8.0));
     }
 
     #[test]
@@ -271,8 +271,8 @@ mod tests {
         };
         ob.merge_parse_update(new_update)
             .expect("broken merge update");
-        assert_eq!(ob.best_bid_price, 700);
-        assert_eq!(ob.best_ask_price, 1100);
+        assert_eq!(ob.best_bid_price, price_to_price_map_index(7.0));
+        assert_eq!(ob.best_ask_price, price_to_price_map_index(11.0));
     }
 
     #[test]
@@ -313,8 +313,8 @@ mod tests {
         };
         ob.merge_parse_update(new_update)
             .expect("broken merge update");
-        assert_eq!(ob.best_ask_price, 1000);
-        assert_eq!(ob.best_bid_price, 900);
+        assert_eq!(ob.best_ask_price, price_to_price_map_index(10.0));
+        assert_eq!(ob.best_bid_price, price_to_price_map_index(9.0));
     }
 
     #[test]
@@ -348,7 +348,7 @@ mod tests {
         };
         ob.merge_parse_update(new_update)
             .expect("broken merge update");
-        assert_eq!(ob.best_ask_price, 1000);
-        assert_eq!(ob.best_bid_price, 800);
+        assert_eq!(ob.best_ask_price, price_to_price_map_index(10.0));
+        assert_eq!(ob.best_bid_price, price_to_price_map_index(8.0));
     }
 }

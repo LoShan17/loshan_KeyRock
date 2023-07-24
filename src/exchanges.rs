@@ -99,19 +99,15 @@ pub async fn get_bitstamp_stream(
 
     println!("sent subscription message");
     let (_, read_stream) = ws_stream_bitstamp.split();
-
-    // try receiving the first message (normally subscription confirmation before adding the stream to the map)
-    // let _ = read_stream.next();
-
     Ok(read_stream)
 }
 
-// TODO: do this full implementation
 pub async fn get_all_streams(
     symbol: &String,
 ) -> Result<StreamMap<&'static str, SplitStream<WebSocketStream<MaybeTlsStream<TcpStream>>>>> {
     let mut streams_map = StreamMap::new();
 
+    // TODO: look into keeping these exchanges into static variable
     // for exchange in EXCHANGES::iter() {
     //     match exchange {
     //         "BINANCE" => {}
@@ -131,7 +127,6 @@ pub async fn get_all_streams(
     Ok(streams_map)
 }
 
-// sanpshot seems not to return the outside "data" wrapper in the Json response
 pub fn bitstamp_json_snapshot_to_levels(value: &Value) -> Result<ParsedUpdate> {
     let mut vector_of_bids: Vec<Level> = Vec::with_capacity(
         value["bids"]
@@ -198,7 +193,6 @@ pub fn bitstamp_json_snapshot_to_levels(value: &Value) -> Result<ParsedUpdate> {
     })
 }
 
-// bitstamp maintains exactly the same format between full Book updates and diff feed
 pub fn bitstamp_json_to_levels(value: &Value) -> Result<ParsedUpdate> {
     let mut vector_of_bids: Vec<Level> = Vec::with_capacity(
         value["data"]["bids"]
@@ -320,7 +314,6 @@ pub fn binance_json_to_levels(value: Value) -> Result<ParsedUpdate> {
     })
 }
 
-// this is actually quite difference from the one returning the Book snapshots flow
 pub fn binance_diff_json_to_levels(value: Value) -> Result<ParsedUpdate> {
     let mut vector_of_bids: Vec<Level> = Vec::with_capacity(value["b"].as_array().unwrap().len());
     let mut vector_of_asks: Vec<Level> = Vec::with_capacity(value["a"].as_array().unwrap().len());
