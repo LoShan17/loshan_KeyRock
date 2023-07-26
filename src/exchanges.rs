@@ -8,8 +8,9 @@ use tokio::net::TcpStream;
 use tokio_stream::StreamMap;
 use tokio_tungstenite::{connect_async, tungstenite::Message, MaybeTlsStream, WebSocketStream};
 
-// maybe consider doing this useful?
-// const EXCHANGES:Vec<String> = vec!["BINANCE".to_string(), "BITSTAMP".to_string()];
+// "BINANCE" "BITSTAMP" are kept hard coded across the codebase
+// maybe a future improvement would be to somehow handle this better
+// every exchange currently would need specific functions anyway.
 #[derive(Debug, Default)]
 pub struct ParsedUpdate {
     pub bids: Vec<Level>,
@@ -22,42 +23,30 @@ pub async fn get_bitstamp_snapshot(symbol: &String) -> Result<ParsedUpdate> {
         "https://www.bitstamp.net/api/v2/order_book/{}/",
         symbol.to_lowercase()
     );
-    println!("{}", url);
-
+    tracing::info!("bitsamp initial snapshot url: {}", url);
     let request_result = reqwest::get(url).await?;
     let message_value = request_result.json::<serde_json::Value>().await?;
-    println!("");
-    println!("binance initial message value");
-    println!("{:?}", message_value);
     let parsed_update = bitstamp_json_snapshot_to_levels(&message_value);
-    println!("");
-    println!("binance initial parsed update");
-    println!("{:?}", parsed_update);
     return parsed_update;
 }
 
 pub async fn get_binance_snapshot(symbol: &String) -> Result<ParsedUpdate> {
     let url = format!(
-        "https://www.binance.us/api/v3/depth?symbol={}&limit=10",
+        "https://www.binance.us/api/v3/depth?symbol={}&limit=1000",
         symbol.to_uppercase()
     );
-    println!("{}", url);
+    tracing::info!("binance initial snapshot url: {}", url);
 
     let request_result = reqwest::get(url).await?;
     let message_value = request_result.json::<serde_json::Value>().await?;
-    println!("");
-    println!("binance initial message value");
-    println!("{:?}", message_value);
     let parsed_update = binance_json_to_levels(message_value);
-    println!("");
-    println!("binance initial parsed update");
-    println!("{:?}", parsed_update);
     return parsed_update;
 }
 
 pub async fn get_binance_stream(
     symbol: &String,
 ) -> Result<SplitStream<WebSocketStream<MaybeTlsStream<TcpStream>>>> {
+    // no depth level (5, 10 or 20) provided below or will return a full depth stream instead of diff stream
     let ws_url_binance = url::Url::parse("wss://stream.binance.us:9443")
         .context("wrong binance url")?
         .join(&format!("/ws/{}@depth@100ms", symbol))?;
@@ -90,14 +79,13 @@ pub async fn get_bitstamp_stream(
             "channel": format!("diff_order_book_{}", symbol)
         }
     });
-    println!("{}", subscribe_msg);
+    tracing::info!("sending bitstamp subscription message: {}", subscribe_msg);
 
     ws_stream_bitstamp
         .send(Message::Text(subscribe_msg.to_string()))
         .await
         .context("failed to subscribe to bitstap")?;
 
-    println!("sent subscription message");
     let (_, read_stream) = ws_stream_bitstamp.split();
     Ok(read_stream)
 }
@@ -107,22 +95,13 @@ pub async fn get_all_streams(
 ) -> Result<StreamMap<&'static str, SplitStream<WebSocketStream<MaybeTlsStream<TcpStream>>>>> {
     let mut streams_map = StreamMap::new();
 
-    // TODO: look into keeping these exchanges into static variable
-    // for exchange in EXCHANGES::iter() {
-    //     match exchange {
-    //         "BINANCE" => {}
-
-    //     }
-
-    // }
-
     let binance_stream_read = get_binance_stream(symbol).await.unwrap();
     streams_map.insert("BINANCE", binance_stream_read);
 
     let bitstamp_stream_read = get_bitstamp_stream(symbol).await.unwrap();
     streams_map.insert("BITSTAMP", bitstamp_stream_read);
 
-    println!("returning both streams for BINANCE and BITSTAMP");
+    tracing::info!("returning both streams for BINANCE and BITSTAMP");
 
     Ok(streams_map)
 }
@@ -303,7 +282,6 @@ pub fn binance_json_to_levels(value: Value) -> Result<ParsedUpdate> {
                 .context("binance ask amount failed as float")?,
             exchange: "BINANCE".to_string(),
         };
-        // are these inserts correct vs index 0
         vector_of_asks.insert(0, level);
     }
 
@@ -315,8 +293,18 @@ pub fn binance_json_to_levels(value: Value) -> Result<ParsedUpdate> {
 }
 
 pub fn binance_diff_json_to_levels(value: Value) -> Result<ParsedUpdate> {
-    let mut vector_of_bids: Vec<Level> = Vec::with_capacity(value["b"].as_array().unwrap().len());
-    let mut vector_of_asks: Vec<Level> = Vec::with_capacity(value["a"].as_array().unwrap().len());
+    let mut vector_of_bids: Vec<Level> = Vec::with_capacity(
+        value["b"]
+            .as_array()
+            .expect("no bids in binance update")
+            .len(),
+    );
+    let mut vector_of_asks: Vec<Level> = Vec::with_capacity(
+        value["a"]
+            .as_array()
+            .expect("no asks in binance update")
+            .len(),
+    );
     let last_update_id = value["E"].as_u64().unwrap();
 
     for bid in value["b"]
@@ -356,7 +344,6 @@ pub fn binance_diff_json_to_levels(value: Value) -> Result<ParsedUpdate> {
                 .context("binance ask amount failed as float")?,
             exchange: "BINANCE".to_string(),
         };
-        // are these inserts correct vs index 0
         vector_of_asks.insert(0, level);
     }
 

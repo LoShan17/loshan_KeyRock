@@ -33,7 +33,7 @@ pub struct OrderBook {
     pub last_update_ids: HashMap<String, u64>,
 }
 
-// Summary trair to allow pretty printing from orderbook-client
+// Summary trait to allow pretty printing from orderbook-client
 impl fmt::Display for Summary {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         // Write strictly the first element into the supplied output
@@ -41,7 +41,7 @@ impl fmt::Display for Summary {
         // operation succeeded or failed. Note that `write!` uses syntax which
         // is very similar to `println!`.
         // let asks_to_display = format!("{:?}", self.asks);
-        let mut asks_to_display = "".to_owned();
+        let mut asks_to_display = "".to_string();
         for level in self.asks.iter().rev() {
             let ask_level_to_print = format!(
                 "{}: {} - {}\n",
@@ -51,7 +51,7 @@ impl fmt::Display for Summary {
             );
             asks_to_display.push_str(&ask_level_to_print)
         }
-        let mut bids_to_display = "".to_owned();
+        let mut bids_to_display = "".to_string();
         for level in self.bids.iter() {
             let bid_level_to_print = format!(
                 "{}: {} - {}\n",
@@ -61,7 +61,7 @@ impl fmt::Display for Summary {
             );
             bids_to_display.push_str(&bid_level_to_print)
         }
-        // let bids_to_display = format!("{:?}", self.bids);
+
         write!(
             f,
             "{}: {}\n{}\n{}",
@@ -139,7 +139,6 @@ impl OrderBook {
             .or_insert(HashMap::new());
 
         if volume_to_volume_mantissa(level.amount) == 0 {
-            println!("catched volume as zeroooo for bid!!!!");
             ref_map.remove(&level.exchange);
             if (price_position == self.best_bid_price) && (ref_map.len() == 0) {
                 for (next_price_index, next_exchange_map) in self.bid_prices_reference.iter().rev()
@@ -167,7 +166,6 @@ impl OrderBook {
             .or_insert(HashMap::new());
 
         if volume_to_volume_mantissa(level.amount) == 0 {
-            println!("catched volume as zeroooo for ask!!!!");
             ref_map.remove(&level.exchange);
             if (price_position == self.best_ask_price) && (ref_map.len() == 0) {
                 for (next_price_index, next_exchange_map) in self.ask_prices_reference.iter() {

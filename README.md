@@ -5,7 +5,11 @@ cargo run --bin orderbook-server
 and after the server is up and running
 
 cargo run --bin orderbook-client btcusdt 10
+or 
+cargo run --bin orderbook-client ethbtc 10
+
 to see summaries (as defined in orderbookaggregator.proto) printed to standar output
+the symbol has to be present on both exchanges or the program will exit with a stream error.
 
 References use for several topics included below:
 
@@ -13,6 +17,7 @@ Rust General:
 https://doc.rust-lang.org/cargo/guide/project-layout.html
 https://stackoverflow.com/questions/57756927/rust-modules-confusion-when-there-is-main-rs-and-lib-rs
 https://rust-cli.github.io/book/tutorial/cli-args.html
+https://tokio.rs/tokio/topics/tracing
 
 OrderBook:
 https://sanket.tech/posts/rustbook/

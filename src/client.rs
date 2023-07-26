@@ -24,7 +24,7 @@ async fn book_summary_stream(
     while let Some(summary) = stream.next().await {
         clearscreen::clear().expect("failed to clear screen");
         match summary {
-            Ok(summary) => println!("{}", summary), //\n{:#?}
+            Ok(summary) => println!("{}", summary),
             Err(err) => {
                 return Err(err.into());
             }

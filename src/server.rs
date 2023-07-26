@@ -26,8 +26,6 @@ impl OrderbookAggregator for OrderbookAggregatorService {
         &self,
         request: Request<SummaryRequest>,
     ) -> Result<tonic::Response<Self::BookSummaryStream>, Status> {
-        // TODO, get both symbol and orderbook reporting_levels from SummaryRequest
-        // let symbol = "ethbtc".to_string();
         let SummaryRequest { symbol, levels } = request.into_inner();
 
         // create streams before taking the 2 snapshots below
@@ -45,25 +43,15 @@ impl OrderbookAggregator for OrderbookAggregatorService {
 
         let mut order_book = OrderBook::new(levels, initial_binance_snaphots)
             .expect("failed to create new orderbook");
-        println!("original binance snapshot print");
-        println!(
-            "bb: {}, ba: {}",
-            order_book.best_bid_price, order_book.best_ask_price
-        );
+
         _ = order_book.merge_parse_update(initial_bitstamp_snapshots);
-        println!(
-            "bb: {}, ba: {}",
-            order_book.best_bid_price, order_book.best_ask_price
-        );
 
         let output = async_stream::try_stream! {
             while let Some((key, message)) = stream_map.next().await {
                 let message = message.expect("failed to unwrap message from streams main loop");
 
-                // bunch of printing for debugging purposes, TODO: remove
-
-                println!("{}", key);
-                println!("this was the message: {}", message);
+                //TODO: remove comment
+                tracing::info!("from exchange {} message received: {}", key, message);
 
                 let message = match message {
                     tungstenite::Message::Text(_) => message,
@@ -89,7 +77,7 @@ impl OrderbookAggregator for OrderbookAggregatorService {
                         let bitstamp_event = &message_value["event"];
 
                         if bitstamp_event.as_str().expect("error in parsing bitstamp event to string") == "bts:subscription_succeeded" {
-                            println!(
+                            tracing::info!(
                                 "received subscription confirmation message with no data, continue"
                             );
                             continue;
@@ -104,12 +92,6 @@ impl OrderbookAggregator for OrderbookAggregatorService {
 
                 let summary = order_book.get_summary().expect("Error in creating summary");
 
-                // bunch of printing for debussing purposes, TODO: remove
-                println!("PRINTING SUMMARY");
-                println!("{:?}", summary);
-                println!("length of bids {}", summary.bids.len());
-                println!("length of asks {}", summary.asks.len());
-                println!("END SUMMARY");
                 yield summary
             }
         };
@@ -120,11 +102,14 @@ impl OrderbookAggregator for OrderbookAggregatorService {
     }
 }
 
-// attempt gRPC server main setup
+// gRPC server main setup
 #[tokio::main]
 async fn main() -> Result<()> {
+    let subscriber = tracing_subscriber::FmtSubscriber::new();
+    tracing::subscriber::set_global_default(subscriber).expect("setting tracing default failed");
+
     let address = "127.0.0.1:5001";
-    println!("Server up and running on {}", address);
+    tracing::info!("Server up and running on {}", address);
 
     let socket_addr = address.parse()?;
     let orderbook_service = OrderbookAggregatorService::default();
