@@ -1,12 +1,18 @@
 KeyRock Challenge defined as per Rust L2.pdf
 
 To run the server:
+```
 cargo run --bin orderbook-server
+```
 
 After the server is up and running:
+```
 cargo run --bin orderbook-client btcusdt 10
+```
 or 
+```
 cargo run --bin orderbook-client ethbtc 10
+```
 
 to see summaries (as defined in orderbookaggregator.proto) printed to standard output
 the symbol has to be present on both exchanges or the program will exit with a stream error.
