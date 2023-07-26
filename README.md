@@ -1,17 +1,17 @@
 KeyRock Challenge defined as per Rust L2.pdf
 
+To run the server:
 cargo run --bin orderbook-server
 
-and after the server is up and running
-
+After the server is up and running:
 cargo run --bin orderbook-client btcusdt 10
 or 
 cargo run --bin orderbook-client ethbtc 10
 
-to see summaries (as defined in orderbookaggregator.proto) printed to standar output
+to see summaries (as defined in orderbookaggregator.proto) printed to standard output
 the symbol has to be present on both exchanges or the program will exit with a stream error.
 
-References use for several topics included below:
+References used for several topics included below:
 
 Rust General:
 https://doc.rust-lang.org/cargo/guide/project-layout.html
@@ -30,7 +30,7 @@ https://docs.rs/tokio-stream/latest/tokio_stream/struct.StreamMap.html
 https://docs.rs/futures/latest/futures/stream/struct.SplitStream.html
 
 https://github.com/binance/binance-spot-api-docs/blob/master/web-socket-streams.md
-notes explaining how to take an initial snaphot of exchnages and apllying the diff is actually the right thing to do for Binance, and since we are doing it also for Bitstamp
+notes explaining how to take an initial snapshot of exchanges and applying the diff is the right thing to do for Binance, and since we are doing it also for Bitstamp
 
 Grcp server/client streaming example
 https://github.com/hyperium/tonic/blob/master/examples/routeguide-tutorial.md
