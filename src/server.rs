@@ -49,8 +49,7 @@ impl OrderbookAggregator for OrderbookAggregatorService {
         let output = async_stream::try_stream! {
             while let Some((key, message)) = stream_map.next().await {
                 let message = message.expect("failed to unwrap message from streams main loop");
-
-                //TODO: remove comment
+                
                 tracing::info!("from exchange {} message received: {}", key, message);
 
                 let message = match message {
