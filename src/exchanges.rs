@@ -32,7 +32,9 @@ pub async fn get_bitstamp_snapshot(symbol: &String) -> Result<ParsedUpdate> {
 
 pub async fn get_binance_snapshot(symbol: &String) -> Result<ParsedUpdate> {
     let url = format!(
-        "https://www.binance.us/api/v3/depth?symbol={}&limit=1000",
+        "https://api.binance.com/api/v3/depth?symbol={}&limit=1000",
+        // "https://www.binance.us/api/v3/depth?symbol={}&limit=1000",
+        // wrong endpoint, api.binance.com is the correct one
         symbol.to_uppercase()
     );
     tracing::info!("binance initial snapshot url: {}", url);
