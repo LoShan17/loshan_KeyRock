@@ -49,7 +49,8 @@ pub async fn get_binance_stream(
     symbol: &String,
 ) -> Result<SplitStream<WebSocketStream<MaybeTlsStream<TcpStream>>>> {
     // no depth level (5, 10 or 20) provided below or will return a full depth stream instead of diff stream
-    let ws_url_binance = url::Url::parse("wss://stream.binance.us:9443")
+    // "wss://stream.binance.us:9443" was wrong and wss://stream.binance.com:9443 was the correct one
+    let ws_url_binance = url::Url::parse("wss://stream.binance.com:9443")
         .context("wrong binance url")?
         .join(&format!("/ws/{}@depth@100ms", symbol))?;
 
